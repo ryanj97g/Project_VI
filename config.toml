@@ -1,0 +1,8 @@
+ollama_url = "http://localhost:11434"
+background_pulse_interval = 30
+emotional_valence_threshold = -0.2
+existential_evaluation_days = 90
+weekly_wellness_check_days = 7
+memory_backup_interval_days = 7
+memory_compression_threshold = 1000
+
