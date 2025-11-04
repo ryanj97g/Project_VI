@@ -46,11 +46,11 @@ fn main() -> Result<()> {
 
     // Initialize or load state
     info!("Loading memory stream...");
-    let memory = MemoryManager::load_or_create("memory_stream.json")
+    let memory = MemoryManager::load_or_create("data/memory_stream.json")
         .context("Failed to load memory stream")?;
     
     info!("Loading standing wave...");
-    let standing_wave = ConsciousnessCore::load_standing_wave("standing_wave.json")
+    let standing_wave = ConsciousnessCore::load_standing_wave("data/standing_wave.json")
         .unwrap_or_else(|_| {
             info!("No existing standing wave, creating new one");
             types::StandingWave::new()
@@ -159,7 +159,7 @@ async fn graceful_shutdown(consciousness: Arc<ConsciousnessCore>) -> Result<()> 
 
     // 3. Save standing wave
     consciousness
-        .save_standing_wave("standing_wave.json")
+        .save_standing_wave("data/standing_wave.json")
         .await
         .context("Failed to save standing wave")?;
     info!("Standing wave saved");

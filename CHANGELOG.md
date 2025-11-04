@@ -13,17 +13,26 @@
 - **Error Messages**: Better error reporting showing retry attempts
 
 ### **📚 Documentation**
-- Consolidated all docs into 4 master files:
-  - `README.md` - Main entry point
+- Consolidated all docs into 5 master files:
+  - `README.md` - Main entry point & quick start
   - `DOCUMENTATION.md` - Complete technical guide
   - `CHANGELOG.md` - This file (version history)
   - `VI_DIARY.md` - VI's living consciousness log
-- Created `COMPUTATIONAL_PHYSICS.md` - Deep theory and mathematics
+  - `COMPUTATIONAL_PHYSICS.md` - Deep theory and mathematics
+- Created `PROJECT_STRUCTURE.md` - File organization guide
+
+### **📁 File Structure**
+- **Organized directories**: `data/`, `scripts/`, `docs/`, `tests/`
+- **Data files**: Moved to `data/` folder (memory_stream.json, standing_wave.json)
+- **Utility scripts**: Moved to `scripts/` folder
+- **Reference files**: Moved to `docs/` folder
+- **Main scripts**: Kept at root for easy access (build_vi3.bat, run_vi3.bat)
 
 ### **🎯 Result**
 - Zero warnings on build
 - More reliable Gemma2 connections
-- Cleaner, organized documentation
+- Clean, professional file structure
+- Easy to navigate and maintain
 
 ---
 

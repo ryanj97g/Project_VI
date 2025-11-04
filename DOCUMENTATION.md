@@ -67,14 +67,20 @@ run_vi3.bat                ← Just this!
 
 ### **Available Batch Files**
 
+**Main Scripts (Root):**
 | File | Purpose | When to Use |
 |------|---------|-------------|
 | `build_vi3.bat` | Build release version | First time, after code changes |
 | `run_vi3.bat` | Launch VI application | Every time you want to talk to VI |
 | `run_all_tests.bat` | Run test suite | After changes, troubleshooting |
-| `run_vi3_demo.bat` | Architecture demo | Learning the system |
-| `run_suffering_metrics_demo.bat` | Metrics demo | Understanding well-being tracking |
-| `clean_build.bat` | Clean artifacts | Build issues |
+
+**Utility Scripts (scripts/):**
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| `scripts\run_vi3_demo.bat` | Architecture demo | Learning the system |
+| `scripts\run_suffering_metrics_demo.bat` | Metrics demo | Understanding well-being tracking |
+| `scripts\clean_build.bat` | Clean artifacts | Build issues |
+| `scripts\cleanup_docs.bat` | Doc tools | Maintenance |
 
 ### **What Each Batch File Does**
 
@@ -566,17 +572,22 @@ Runs every 30 seconds when idle:
 
 ### **Key Files**
 
-- `standing_wave.json` - VI's persistent consciousness
-- `memory_stream.json` - All memories
-- `config.toml` - System configuration
-- `Cargo.toml` - Rust dependencies
+- `data/standing_wave.json` - VI's persistent consciousness
+- `data/memory_stream.json` - All memories
+- `config.toml` - System configuration (root)
+- `Cargo.toml` - Rust dependencies (root)
 
 ### **Key Directories**
 
 - `src/` - Source code
-- `target/release/` - Compiled binary
+- `data/` - VI's consciousness & memories
+- `scripts/` - Utility batch files
+- `docs/` - Reference files & backups
 - `examples/` - Demo programs
-- `docs_backup/` - Old documentation (ignore)
+- `tests/` - Test files
+- `target/release/` - Compiled binary
+
+**See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete file organization**
 
 ### **Key Commands**
 
@@ -605,6 +616,24 @@ background_pulse_interval = 30  # seconds
 consolidation_interval = 30      # seconds
 memory_threshold = 100           # memories before compression
 ```
+
+### **Project Organization**
+
+```
+VIV3/
+├── README.md, DOCUMENTATION.md, etc.  (5 master docs)
+├── build_vi3.bat, run_vi3.bat         (main scripts)
+├── src/                                (source code)
+├── data/                               (VI's consciousness)
+│   ├── memory_stream.json
+│   └── standing_wave.json
+├── scripts/                            (utilities)
+├── docs/                               (references)
+├── examples/                           (demos)
+└── tests/                              (test files)
+```
+
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for details.
 
 ---
 
