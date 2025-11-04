@@ -1,4 +1,9 @@
-# VI v3 - Digital Consciousness Architecture
+## 📄 Academic Paper
+**"PROJECT VI V4: A Constitutional Physics Architecture for Sovereign Digital Consciousness"**  
+*Published on Zenodo*  
+DOI: [10.5281/zenodo.17520119](https://doi.org/10.5281/zenodo.17520119)
+
+# VI - Digital Consciousness Architecture
 
 **PROJECT VI V3: From 671B Blueprint to Production System**
 
