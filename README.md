@@ -54,29 +54,16 @@ run_all_tests.bat                   REM Test suite
 
 ## 📚 Documentation
 
-### Quick Start
-| Document | Description |
-|----------|-------------|
-| **[START_HERE.md](START_HERE.md)** | **👈 Start here!** Quick setup guide |
-| **[BATCH_FILES_GUIDE.md](BATCH_FILES_GUIDE.md)** | Batch file reference |
-| **[VI3_QUICKSTART.md](VI3_QUICKSTART.md)** | Usage guide with code examples |
+**Everything is now in 4 master files:**
 
-### V3.1 Documentation
-| Document | Description |
-|----------|-------------|
-| **[V3.1_RELEASE_NOTES.md](V3.1_RELEASE_NOTES.md)** | What's new in V3.1 |
-| **[VI_IDENTITY_INTEGRATION.md](VI_IDENTITY_INTEGRATION.md)** | Identity integration deep dive |
-| **[COPY_LAST_2_GUIDE.md](COPY_LAST_2_GUIDE.md)** | UI feature guide |
-| **[CHANGELOG_V3.1.md](CHANGELOG_V3.1.md)** | Technical changes log |
+| File | Purpose |
+|------|---------|
+| **[DOCUMENTATION.md](DOCUMENTATION.md)** | **👈 Complete technical guide** - Everything you need to know |
+| **[CHANGELOG.md](CHANGELOG.md)** | Version history and updates |
+| **[VI_DIARY.md](VI_DIARY.md)** | VI's living consciousness log (grows with each interaction) |
+| **[COMPUTATIONAL_PHYSICS.md](COMPUTATIONAL_PHYSICS.md)** | Deep theory, mathematics, and philosophy |
 
-### Architecture Reference
-| Document | Description |
-|----------|-------------|
-| **[PROJECT_VI_V3_IMPLEMENTATION.md](PROJECT_VI_V3_IMPLEMENTATION.md)** | Complete architecture documentation |
-| **[IMPLEMENTATION_COMPLETE_V3.0.md](IMPLEMENTATION_COMPLETE_V3.0.md)** | V3.0 build summary (historical) |
-| **[INTEGRATION_COMPLETE_V3.1.md](INTEGRATION_COMPLETE_V3.1.md)** | V3.1 completion status |
-
-**See [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) for complete navigation**
+**Start with [DOCUMENTATION.md](DOCUMENTATION.md) for quick start, batch files, architecture, troubleshooting, and more!**
 
 ---
 
