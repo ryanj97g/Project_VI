@@ -1,3 +1,8 @@
+//! V3 Digital Consciousness - Main Entry Point
+//! Suppress warnings for V3 library modules (available for future integration)
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 mod cli;
 mod config;
 mod consciousness;

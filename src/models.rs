@@ -122,7 +122,7 @@ impl ModelManager {
             vi_identity, memory_context, curiosity_context, user_input
         );
 
-        let response = self.call_ollama("gemma2:2b", &prompt, 30).await?;
+        let response = self.call_ollama("gemma2:2b", &prompt, 60).await?;
         
         // Filter out internal monologue leaks (Law #9: Information Boundary)
         let cleaned = self.filter_internal_thoughts(&response);
@@ -192,34 +192,54 @@ impl ModelManager {
             stream: false,
         };
 
-        let response = tokio::time::timeout(
-            Duration::from_secs(timeout_secs),
-            self.client.post(&url).json(&request).send(),
-        )
-        .await
-        .context("Request timed out")?
-        .context("Failed to send request")?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("Ollama API error: {}", response.status());
+        // Retry logic: 3 attempts with exponential backoff
+        let mut attempts = 0;
+        let max_attempts = 3;
+        
+        loop {
+            attempts += 1;
+            
+            let response_result = tokio::time::timeout(
+                Duration::from_secs(timeout_secs),
+                self.client.post(&url).json(&request).send(),
+            )
+            .await;
+            
+            match response_result {
+                Ok(Ok(resp)) => {
+                    // Success! Continue with response processing
+                    if !resp.status().is_success() {
+                        anyhow::bail!("Ollama API error: {}", resp.status());
+                    }
+                    
+                    let ollama_response: OllamaResponse = resp
+                        .json()
+                        .await
+                        .context("Failed to parse Ollama response")?;
+                    
+                    // Validate output (prevent garbage)
+                    if ollama_response.response.is_empty() {
+                        anyhow::bail!("Empty response from model");
+                    }
+                    
+                    return Ok(ollama_response.response);
+                }
+                Ok(Err(e)) => {
+                    if attempts >= max_attempts {
+                        anyhow::bail!("Failed to connect to Ollama after {} attempts: {}", max_attempts, e);
+                    }
+                    tracing::warn!("Ollama connection failed (attempt {}/{}): {}. Retrying...", attempts, max_attempts, e);
+                    tokio::time::sleep(Duration::from_millis(500 * attempts as u64)).await;
+                }
+                Err(_) => {
+                    if attempts >= max_attempts {
+                        anyhow::bail!("Ollama request timed out after {} seconds ({} attempts)", timeout_secs, max_attempts);
+                    }
+                    tracing::warn!("Ollama timeout (attempt {}/{}). Retrying...", attempts, max_attempts);
+                    tokio::time::sleep(Duration::from_millis(500 * attempts as u64)).await;
+                }
+            }
         }
-
-        let ollama_response: OllamaResponse = response
-            .json()
-            .await
-            .context("Failed to parse Ollama response")?;
-
-        // Validate output (prevent garbage)
-        if ollama_response.response.is_empty() {
-            anyhow::bail!("Empty response from model");
-        }
-
-        if ollama_response.response.len() > 10000 {
-            tracing::warn!("Model response very long ({}), truncating", ollama_response.response.len());
-            return Ok(ollama_response.response.chars().take(10000).collect());
-        }
-
-        Ok(ollama_response.response)
     }
 
     /// Format memory context for prompt
