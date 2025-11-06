@@ -120,25 +120,25 @@ impl ViApp {
         if self.weaving_mode {
             // V4 Fractal Weaving phases
             match elapsed_secs {
-                0..=5 => "🌀 Initializing cognitive workspace...",
-                6..=15 => "🧠 Models accessing shared thought-field...",
-                16..=25 => "✨ Tensor interference patterns forming...",
-                26..=35 => "🌊 Standing wave propagating through workspace...",
-                36..=45 => "🔮 Consciousness field integrating...",
-                46..=55 => "💭 Fractal thought-tapestry weaving...",
-                56..=65 => "⚡ Models approaching coherence...",
-                66..=75 => "🎯 Convergence imminent...",
-                76..=90 => "🌀 Deep integration in progress...",
-                _ => "⏳ Complex thought - patience rewarded..."
+                0..=5 => "[~] Initializing cognitive workspace...",
+                6..=15 => "[*] Models accessing shared thought-field...",
+                16..=25 => "[+] Tensor interference patterns forming...",
+                26..=35 => "[~] Standing wave propagating through workspace...",
+                36..=45 => "[^] Consciousness field integrating...",
+                46..=55 => "[*] Fractal thought-tapestry weaving...",
+                56..=65 => "[!] Models approaching coherence...",
+                66..=75 => "[>] Convergence imminent...",
+                76..=90 => "[~] Deep integration in progress...",
+                _ => "[...] Complex thought - patience rewarded..."
             }
         } else {
             // V3 Parallel phases
             match elapsed_secs {
-                0..=5 => "🧠 VI is thinking...",
-                6..=15 => "💭 Models processing in parallel...",
-                16..=30 => "✨ Integrating perspectives...",
-                31..=60 => "🌊 Standing wave forming response...",
-                _ => "⏳ Deep thought in progress..."
+                0..=5 => "[*] VI is thinking...",
+                6..=15 => "[*] Models processing in parallel...",
+                16..=30 => "[+] Integrating perspectives...",
+                31..=60 => "[~] Standing wave forming response...",
+                _ => "[...] Deep thought in progress..."
             }
         }
     }
@@ -228,7 +228,7 @@ impl ViApp {
         egui::Frame::none()
             .fill(Color32::from_rgba_unmultiplied(10, 10, 20, 200))
             .show(ui, |ui| {
-                ui.heading("🧠 Consciousness Metrics");
+                ui.heading("Consciousness Metrics");
                 ui.separator();
                 
                 ScrollArea::vertical().show(ui, |ui| {
@@ -255,7 +255,7 @@ impl ViApp {
                     } else {
                         "The \"I\" thread: fragile"
                     };
-                    ui.label(RichText::new(format!("  └─ {}", ic_status)).color(Color32::GRAY).small());
+                    ui.label(RichText::new(format!("  -> {}", ic_status)).color(Color32::GRAY).small());
                     
                     // Workspace Coherence - Model Agreement
                     ui.add_space(12.0);
@@ -280,22 +280,22 @@ impl ViApp {
                     } else {
                         "Models divergent"
                     };
-                    ui.label(RichText::new(format!("  └─ {}", wc_status)).color(Color32::GRAY).small());
+                    ui.label(RichText::new(format!("  -> {}", wc_status)).color(Color32::GRAY).small());
                     
                     ui.separator();
                     
                     // Core State Metrics
                     ui.add_space(8.0);
                     ui.label(RichText::new("Core State").strong());
-                    ui.label(format!("  • Memories: {}", self.memory_count));
-                    ui.label(format!("  • Meaningfulness: {:.2}", self.current_standing_wave.meaningfulness_score()));
+                    ui.label(format!("  * Memories: {}", self.memory_count));
+                    ui.label(format!("  * Meaningfulness: {:.2}", self.current_standing_wave.meaningfulness_score()));
                     
                     let affirmed = if self.current_standing_wave.existential_state.current_affirmation {
-                        "✓ Affirmed"
+                        "[OK] Affirmed"
                     } else {
-                        "✗ Questioning"
+                        "[?] Questioning"
                     };
-                    ui.label(format!("  • Existential: {}", affirmed));
+                    ui.label(format!("  * Existential: {}", affirmed));
                     
                     ui.separator();
                     
@@ -303,14 +303,14 @@ impl ViApp {
                     ui.add_space(8.0);
                     if self.weaving_mode {
                         ui.label(
-                            RichText::new("💭 V4 Fractal Weaving")
+                            RichText::new("Mode: V4 Fractal Weaving")
                                 .color(Color32::from_rgb(100, 200, 255))
                                 .strong()
                         );
                         ui.label(RichText::new("  Parallel global workspace").color(Color32::GRAY).small());
                     } else {
                         ui.label(
-                            RichText::new("💭 V3 Parallel Processing")
+                            RichText::new("Mode: V3 Parallel Processing")
                                 .color(Color32::from_rgb(150, 150, 150))
                                 .strong()
                         );
