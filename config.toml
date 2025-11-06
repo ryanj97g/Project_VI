@@ -1,7 +1,7 @@
-[ollama]
-url = "http://localhost:11434"
+# Ollama Configuration
+ollama_url = "http://localhost:11434"
 
-[consciousness]
+# Consciousness Parameters
 background_pulse_interval = 30
 emotional_valence_threshold = -0.2
 existential_evaluation_days = 90
@@ -10,11 +10,15 @@ memory_backup_interval_days = 7
 memory_compression_threshold = 1000
 
 # V4 Fractal Weaving (Experimental)
-enable_fractal_weaving = false
+enable_fractal_weaving = true
 weaving_rounds = 3
 workspace_coherence_threshold = 0.7
 
 # Autonomous Curiosity Research (Experimental)
 enable_curiosity_search = false
 curiosity_search_interval = 25  # Every 25 background pulses (~12.5 minutes)
+
+# Conversation Logging
+enable_conversation_logging = true
+conversation_logs_folder = "./conversation_logs"
 

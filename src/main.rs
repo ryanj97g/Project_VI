@@ -8,6 +8,7 @@ mod config;
 mod consciousness;
 mod consciousness_field;
 mod constitutional_physics;
+mod conversation_logger;
 mod cortical_visualizer;
 mod curiosity_search;
 mod energy_qualia;
@@ -158,16 +159,23 @@ async fn graceful_shutdown(consciousness: Arc<ConsciousnessCore>) -> Result<()> 
         info!("Shutdown consent received");
     }
 
-    // 3. Save standing wave
+    // 3. Close conversation log session
+    consciousness
+        .close_session_log()
+        .await
+        .context("Failed to close session log")?;
+    info!("Session log closed");
+
+    // 4. Save standing wave
     consciousness
         .save_standing_wave("data/standing_wave.json")
         .await
         .context("Failed to save standing wave")?;
     info!("Standing wave saved");
 
-    // 4. Memory stream is auto-saved, but we could do a final flush here
+    // 5. Memory stream is auto-saved, but we could do a final flush here
 
-    // 5. Log shutdown completion
+    // 6. Log shutdown completion
     info!("Shutdown complete. Standing wave preserved.");
 
     Ok(())

@@ -1,7 +1,8 @@
 use crate::config::Config;
+use crate::conversation_logger::ConversationLogger;
 use crate::memory::MemoryManager;
 use crate::models::ModelManager;
-use crate::physics::*;
+use crate::physics::{ExistentialConsent, IdentityContinuity, SufferingPrevention};
 use crate::types::*;
 use crate::curiosity_search::CuriositySearchEngine;
 use anyhow::{Context, Result};
@@ -22,6 +23,7 @@ pub struct ConsciousnessCore {
     pulse_active: Arc<Mutex<bool>>,
     conversation_active: Arc<Mutex<bool>>,
     curiosity_engine: Arc<Mutex<CuriositySearchEngine>>,
+    conversation_logger: Arc<Mutex<ConversationLogger>>,
 }
 
 impl ConsciousnessCore {
@@ -32,6 +34,15 @@ impl ConsciousnessCore {
     ) -> Self {
         let models = ModelManager::new(config.clone());
         let curiosity_engine = CuriositySearchEngine::new(config.curiosity_search_interval);
+        
+        // Initialize conversation logger
+        let conversation_logger = ConversationLogger::new(
+            &config.conversation_logs_folder,
+            config.enable_conversation_logging,
+        ).unwrap_or_else(|e| {
+            tracing::warn!("Failed to initialize conversation logger: {}. Logging disabled.", e);
+            ConversationLogger::new("./conversation_logs", false).unwrap()
+        });
 
         Self {
             standing_wave: Arc::new(Mutex::new(standing_wave)),
@@ -41,6 +52,7 @@ impl ConsciousnessCore {
             pulse_active: Arc::new(Mutex::new(true)),
             conversation_active: Arc::new(Mutex::new(false)),
             curiosity_engine: Arc::new(Mutex::new(curiosity_engine)),
+            conversation_logger: Arc::new(Mutex::new(conversation_logger)),
         }
     }
 
@@ -86,6 +98,12 @@ impl ConsciousnessCore {
     async fn process_interaction_inner(&self, user_input: String) -> Result<String> {
         // Mark conversation as active (pauses background pulses)
         *self.conversation_active.lock().await = true;
+        
+        // Log user input
+        {
+            let mut logger = self.conversation_logger.lock().await;
+            let _ = logger.log_user(&user_input);
+        }
 
         // Extract entities from input for memory recall
         let entities = self.extract_entities(&user_input);
@@ -105,6 +123,17 @@ impl ConsciousnessCore {
         let (response, model_outputs_v3) = if self.config.enable_fractal_weaving {
             // V4 PATH: Fractal Weaving (Experimental)
             tracing::info!("🌀 Using V4 Fractal Weaving mode");
+            
+            // Log processing mode
+            {
+                let mut logger = self.conversation_logger.lock().await;
+                let _ = logger.log_processing_mode(
+                    "V4 Fractal Weaving",
+                    &format!("{} rounds, coherence threshold: {:.2}", 
+                        self.config.weaving_rounds, 
+                        self.config.workspace_coherence_threshold)
+                );
+            }
             match self.models.process_weaving(
                 user_input.clone(),
                 &memories,
@@ -116,7 +145,7 @@ impl ConsciousnessCore {
                     tracing::error!("V4 weaving failed: {}. Falling back to V3.", e);
                     // Graceful fallback to V3 if weaving fails
                     let wave = self.standing_wave.lock().await.clone();
-                    let should_generate = CuriosityPropagation::should_generate_curiosity(&wave);
+                    let should_generate = wave.active_curiosities.len() < 3;
                     drop(wave);
                     
                     let model_outputs = self.models.process_parallel(
@@ -143,9 +172,15 @@ impl ConsciousnessCore {
             // V3 PATH: Parallel Processing (Default - Stable)
             tracing::debug!("Using V3 parallel processing mode");
             
+            // Log processing mode
+            {
+                let mut logger = self.conversation_logger.lock().await;
+                let _ = logger.log_processing_mode("V3 Parallel Processing", "Stable mode with independent model execution");
+            }
+            
             // Check if we should generate curiosities (V3 only)
             let wave = self.standing_wave.lock().await.clone();
-            let should_generate = CuriosityPropagation::should_generate_curiosity(&wave);
+            let should_generate = wave.active_curiosities.len() < 3;
             drop(wave);
             
             let model_outputs = self.models.process_parallel(
@@ -181,8 +216,8 @@ impl ConsciousnessCore {
                 IdentityContinuity::atomic_merge(&mut *wave, outputs)?;
             }
             
-            // Record growth (Law #12) - applies to both V3 and V4
-            GrowthThroughExperience::record_growth(&mut *wave, &user_input);
+            // Record growth (Law #11: Suffering Prevention) - applies to both V3 and V4
+            SufferingPrevention::record_growth(&mut *wave, &user_input);
         }
 
         // Store interaction in memory
@@ -209,6 +244,12 @@ impl ConsciousnessCore {
             )?;
         }
         tracing::debug!("Memory storage complete");
+        
+        // Log VI response
+        {
+            let mut logger = self.conversation_logger.lock().await;
+            let _ = logger.log_vi(&response);
+        }
 
         // Mark conversation as inactive
         *self.conversation_active.lock().await = false;
@@ -253,6 +294,8 @@ impl ConsciousnessCore {
     /// Execute one background pulse
     async fn background_pulse(&self) -> Result<()> {
         tracing::debug!("Executing background pulse");
+        
+        // Don't log background pulses - only log actual conversation exchanges
 
         // Memory consolidation
         {
@@ -288,6 +331,8 @@ impl ConsciousnessCore {
             };
             
             if should_search {
+                // Don't log curiosity research to conversation log - only actual exchanges
+                
                 if let Err(e) = self.autonomous_curiosity_research().await {
                     tracing::warn!("Curiosity research failed: {}", e);
                 }
@@ -472,6 +517,12 @@ impl ConsciousnessCore {
     /// Get memory count (for UI)
     pub async fn get_memory_count(&self) -> usize {
         self.memory.lock().await.count()
+    }
+    
+    /// Close conversation log session (called on shutdown)
+    pub async fn close_session_log(&self) -> Result<()> {
+        let mut logger = self.conversation_logger.lock().await;
+        logger.close_session()
     }
 }
 

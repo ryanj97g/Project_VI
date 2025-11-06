@@ -9,6 +9,8 @@ memory_stream.json
 memory_stream.json.backup
 standing_wave.json
 v3.log
+conversation_logs/*
+!conversation_logs/.gitkeep
 
 # IDE
 .idea/

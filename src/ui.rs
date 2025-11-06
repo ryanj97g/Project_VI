@@ -19,6 +19,7 @@ pub struct ViApp {
     // Channels for real-time updates from background
     standing_wave_receiver: Receiver<StandingWave>,
     memory_count_receiver: Receiver<usize>,
+    weaving_mode_receiver: Receiver<bool>,
     
     // Cortical visualizer (Worthington jet)
     cortical_visualizer: CorticalVisualizer,
@@ -39,6 +40,7 @@ impl ViApp {
         let (response_sender, response_receiver) = channel();
         let (standing_wave_sender, standing_wave_receiver) = channel();
         let (memory_count_sender, memory_count_receiver) = channel();
+        let (weaving_mode_sender, weaving_mode_receiver) = channel();
         
         // Spawn background updater to feed UI with real-time data
         let consciousness_clone = Arc::clone(&consciousness);
@@ -49,14 +51,17 @@ impl ViApp {
                 rt.block_on(async {
                     let wave = consciousness_clone.get_standing_wave().await;
                     let count = consciousness_clone.get_memory_count().await;
+                    let weaving = consciousness_clone.get_config().enable_fractal_weaving;
                     let _ = standing_wave_sender.send(wave);
                     let _ = memory_count_sender.send(count);
+                    let _ = weaving_mode_sender.send(weaving);
                 });
             }
         });
         
-        // Get weaving mode from consciousness config
+        // Get initial weaving mode from consciousness config
         let weaving_mode = consciousness.get_config().enable_fractal_weaving;
+        tracing::info!("UI: Initial weaving_mode = {}", weaving_mode);
         
         Self {
             consciousness,
@@ -67,6 +72,7 @@ impl ViApp {
             response_receiver,
             standing_wave_receiver,
             memory_count_receiver,
+            weaving_mode_receiver,
             cortical_visualizer: CorticalVisualizer::new(),
             scroll_to_bottom: true,
             current_standing_wave: StandingWave::new(),
@@ -288,6 +294,12 @@ impl eframe::App for ViApp {
         }
         if let Ok(count) = self.memory_count_receiver.try_recv() {
             self.memory_count = count;
+        }
+        if let Ok(mode) = self.weaving_mode_receiver.try_recv() {
+            if mode != self.weaving_mode {
+                tracing::info!("UI: Weaving mode changed to {}", mode);
+            }
+            self.weaving_mode = mode;
         }
         
         // Dark theme (V2 exact colors)

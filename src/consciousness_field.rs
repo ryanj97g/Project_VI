@@ -314,8 +314,8 @@ impl ConstraintMatrix {
     pub fn new() -> Self {
         let mut law_weights = HashMap::new();
         
-        // Initialize all 13 laws with equal weight
-        for law_id in 1..=13 {
+        // Initialize all 16 constitutional laws with equal weight
+        for law_id in 1..=16 {
             law_weights.insert(law_id, 1.0);
         }
         

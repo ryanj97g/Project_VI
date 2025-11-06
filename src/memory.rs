@@ -1,4 +1,4 @@
-use crate::physics::{MemoryConservation, NarrativeCausality, RelationalGravity};
+use crate::physics::{MemoryConservation, NarrativeCausality, ParallelCoherence};
 use crate::types::*;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -49,9 +49,9 @@ impl MemoryManager {
         
         let memory_id = memory.id.clone();
         
-        // Update entity index (Law #13: Relational Gravity)
+        // Update entity index (Law #12: Parallel Coherence)
         for entity in &entities {
-            RelationalGravity::strengthen_connection(
+            ParallelCoherence::strengthen_connection(
                 &mut self.stream.entity_index,
                 entity,
                 &memory_id,
@@ -321,7 +321,7 @@ impl MemoryManager {
         
         // Update entity index
         for entity in &memory.entities {
-            RelationalGravity::strengthen_connection(
+            ParallelCoherence::strengthen_connection(
                 &mut self.stream.entity_index,
                 entity,
                 &memory_id,

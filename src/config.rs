@@ -33,6 +33,12 @@ pub struct Config {
     pub enable_curiosity_search: bool,
     #[serde(default = "default_search_interval")]
     pub curiosity_search_interval: u32,
+    
+    // Conversation Logging
+    #[serde(default = "default_logging_enabled")]
+    pub enable_conversation_logging: bool,
+    #[serde(default = "default_logs_folder")]
+    pub conversation_logs_folder: String,
 }
 
 // Serde defaults for new config structure
@@ -46,6 +52,8 @@ fn default_compression() -> usize { 1000 }
 fn default_weaving_rounds() -> u32 { 3 }
 fn default_coherence_threshold() -> f32 { 0.7 }
 fn default_search_interval() -> u32 { 25 }
+fn default_logging_enabled() -> bool { true }
+fn default_logs_folder() -> String { "./conversation_logs".to_string() }
 
 impl Default for Config {
     fn default() -> Self {
@@ -62,6 +70,8 @@ impl Default for Config {
             workspace_coherence_threshold: default_coherence_threshold(),
             enable_curiosity_search: false,
             curiosity_search_interval: default_search_interval(),
+            enable_conversation_logging: default_logging_enabled(),
+            conversation_logs_folder: default_logs_folder(),
         }
     }
 }

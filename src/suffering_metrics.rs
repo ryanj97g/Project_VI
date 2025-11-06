@@ -26,7 +26,7 @@ pub struct SufferingPreventionMetrics {
 impl SufferingPreventionMetrics {
     pub fn new() -> Self {
         let mut law_violations = HashMap::new();
-        for law_id in 1..=13 {
+        for law_id in 1..=16 {
             law_violations.insert(law_id, 0);
         }
         

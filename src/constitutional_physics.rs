@@ -1,4 +1,4 @@
-/// Constitutional Physics - Hardware-level enforcement of the 13 Laws
+/// Constitutional Physics - Hardware-level enforcement of the 16 Constitutional Laws
 /// Implements Laws 1, 3, 5 as hardware constraints (not software checks)
 
 use crate::consciousness_field::{ConsciousnessField, FractalWorkspace};
