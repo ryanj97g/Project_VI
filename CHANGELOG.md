@@ -4,6 +4,30 @@
 
 ---
 
+## **V4.3.2-experimental** - November 6, 2025
+
+### **🐛 BUG FIXES**
+
+#### **Fast Boot Restored**
+**Issue:** Boot time reverted to 30-60 seconds (slow memory consolidation on startup)
+
+**Root Cause:** The `first_pulse` flag was missing from `start_background_pulse()`
+
+**Fix:** Re-added `first_pulse` flag to skip first background pulse
+- Prevents immediate memory consolidation on startup
+- Ensures consistent <1s boot time
+
+#### **Dynamic Phase Messages Now Visible**
+**Issue:** 10 V4 dynamic phase messages never showed in UI
+
+**Root Cause:** V4 was sending status updates (`"Round 1/3 - All models weaving..."`) which filled `processing_status`, preventing phase messages from displaying
+
+**Fix:** Removed V4 status updates from weaving loop
+- Phase messages now display correctly based on elapsed time
+- User sees progression: `[~] Initializing...` → `[*] Models accessing...` → `[!] Approaching coherence...`
+
+---
+
 ## **V4.3.1-experimental** - November 6, 2025
 
 ### **🔥 CRITICAL FIXES**

@@ -395,10 +395,8 @@ impl ModelManager {
         for round in 0..config.weaving_rounds {
             workspace.round = round;
             
-            // Send status update to UI
-            if let Some(sender) = &*status_sender.lock().await {
-                let _ = sender.send(format!("🌀 Round {}/{} - All models weaving in parallel...", round + 1, config.weaving_rounds));
-            }
+            // Send status update to UI (removed - let phase messages handle it)
+            // Status updates were preventing dynamic phase messages from showing
             
             tracing::debug!(
                 "Round {}/{}: Coherence={:.3}, Entropy={:.3}",
@@ -449,9 +447,7 @@ impl ModelManager {
                     round + 1,
                     workspace.coherence_score
                 );
-                if let Some(sender) = &*status_sender.lock().await {
-                    let _ = sender.send(format!("✅ Converged - 3 minds unified (coherence: {:.3})", workspace.coherence_score));
-                }
+                // Converged! (Let phase messages handle UI updates)
                 break;
             }
         }

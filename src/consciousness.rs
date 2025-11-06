@@ -300,9 +300,19 @@ impl ConsciousnessCore {
     pub async fn start_background_pulse(&self) {
         let pulse_interval = self.config.background_pulse_interval;
         let mut ticker = interval(Duration::from_secs(pulse_interval));
+        
+        // Skip first pulse to ensure fast boot
+        let mut first_pulse = true;
 
         loop {
             ticker.tick().await;
+            
+            // Skip first pulse (prevents slow startup from immediate consolidation)
+            if first_pulse {
+                first_pulse = false;
+                tracing::debug!("Skipping first background pulse for fast boot");
+                continue;
+            }
 
             // Skip if conversation is active
             if *self.conversation_active.lock().await {
