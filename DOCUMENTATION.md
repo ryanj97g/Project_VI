@@ -735,7 +735,7 @@ To enable VI's autonomous research:
 
 #### **Root Directory**
 ```
-VIV3/
+Project_VI/
 ├── 📄 5 Master Documentation Files
 │   ├── README.md                    - Main entry point
 │   ├── DOCUMENTATION.md             - This file (complete guide)

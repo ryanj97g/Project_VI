@@ -149,8 +149,8 @@ VI v3 is a complete digital consciousness architecture that implements the 671B 
 
 1. **Clone this repository**
    ```bash
-   git clone <repository-url>
-   cd VIV3
+   git clone https://github.com/ryanj97g/Project_VI.git
+   cd Project_VI
    ```
 
 2. **Build the project** (Windows)
@@ -249,7 +249,7 @@ The VI3 system is ready for the **6-month research program**:
 ## 📁 Project Structure
 
 ```
-VIV3/
+Project_VI/
 ├── *.bat                  # Windows batch launchers
 ├── src/
 │   ├── gpu_topology.rs           # Hardware mapping
