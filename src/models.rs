@@ -5,7 +5,9 @@ use crate::constitutional_physics::validate_weaving_coherence;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize)]
 struct OllamaRequest {
@@ -370,12 +372,13 @@ impl ModelManager {
     }
     
     /// V4 Fractal Weaving - Process input through iterative model collaboration
-    pub async fn process_weaving(
+    pub async fn process_weaving_with_status(
         &self,
         user_input: String,
         recalled_memories: &[Memory],
         standing_wave: &StandingWave,
         config: &Config,
+        status_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<String>>>>,
     ) -> Result<String> {
         tracing::info!("🌀 V4 Fractal Weaving enabled - {} rounds", config.weaving_rounds);
         
@@ -391,6 +394,11 @@ impl ModelManager {
         for round in 0..config.weaving_rounds {
             workspace.round = round;
             
+            // Send status update to UI
+            if let Some(sender) = &*status_sender.lock().await {
+                let _ = sender.send(format!("🌀 Round {}/{}...", round + 1, config.weaving_rounds));
+            }
+            
             tracing::debug!(
                 "Round {}/{}: Coherence={:.3}, Entropy={:.3}",
                 round + 1,
@@ -400,8 +408,19 @@ impl ModelManager {
             );
             
             // Sequential weaving: Gemma2 -> TinyLlama -> DistilBERT
+            if let Some(sender) = &*status_sender.lock().await {
+                let _ = sender.send(format!("🌀 Round {}/{} - Gemma2 refining...", round + 1, config.weaving_rounds));
+            }
             gemma_weaver.weave(&mut workspace).await?;
+            
+            if let Some(sender) = &*status_sender.lock().await {
+                let _ = sender.send(format!("🌀 Round {}/{} - TinyLlama adding depth...", round + 1, config.weaving_rounds));
+            }
             tinyllama_weaver.weave(&mut workspace).await?;
+            
+            if let Some(sender) = &*status_sender.lock().await {
+                let _ = sender.send(format!("🌀 Round {}/{} - DistilBERT coherence check...", round + 1, config.weaving_rounds));
+            }
             distilbert_weaver.weave(&mut workspace).await?;
             
             // Constitutional validation after each round
@@ -414,6 +433,9 @@ impl ModelManager {
                     round + 1,
                     workspace.coherence_score
                 );
+                if let Some(sender) = &*status_sender.lock().await {
+                    let _ = sender.send(format!("✅ Converged (coherence: {:.3})", workspace.coherence_score));
+                }
                 break;
             }
         }

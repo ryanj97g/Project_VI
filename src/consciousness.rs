@@ -24,6 +24,7 @@ pub struct ConsciousnessCore {
     conversation_active: Arc<Mutex<bool>>,
     curiosity_engine: Arc<Mutex<CuriositySearchEngine>>,
     conversation_logger: Arc<Mutex<ConversationLogger>>,
+    status_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<String>>>>,
 }
 
 impl ConsciousnessCore {
@@ -53,6 +54,19 @@ impl ConsciousnessCore {
             conversation_active: Arc::new(Mutex::new(false)),
             curiosity_engine: Arc::new(Mutex::new(curiosity_engine)),
             conversation_logger: Arc::new(Mutex::new(conversation_logger)),
+            status_sender: Arc::new(Mutex::new(None)),
+        }
+    }
+    
+    /// Set status sender for UI updates
+    pub async fn set_status_sender(&self, sender: std::sync::mpsc::Sender<String>) {
+        *self.status_sender.lock().await = Some(sender);
+    }
+    
+    /// Send status update to UI (non-blocking)
+    async fn send_status(&self, status: &str) {
+        if let Some(sender) = &*self.status_sender.lock().await {
+            let _ = sender.send(status.to_string());
         }
     }
 
@@ -138,6 +152,7 @@ impl ConsciousnessCore {
         let (response, model_outputs_v3) = if self.config.enable_fractal_weaving {
             // V4 PATH: Fractal Weaving (Experimental)
             tracing::info!("🌀 Using V4 Fractal Weaving mode");
+            self.send_status("🌀 V4 Fractal Weaving initiated...").await;
             
             // Log processing mode
             {
@@ -149,11 +164,12 @@ impl ConsciousnessCore {
                         self.config.workspace_coherence_threshold)
                 );
             }
-            match self.models.process_weaving(
+            match self.models.process_weaving_with_status(
                 user_input.clone(),
                 &memories,
                 &*self.standing_wave.lock().await,
                 &self.config,
+                self.status_sender.clone(),
             ).await {
                 Ok(woven_response) => (woven_response, None),
                 Err(e) => {

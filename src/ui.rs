@@ -5,6 +5,7 @@ use eframe::egui;
 use egui::{Color32, RichText, ScrollArea};
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Instant;
 
 pub struct ViApp {
     consciousness: Arc<ConsciousnessCore>,
@@ -20,6 +21,7 @@ pub struct ViApp {
     standing_wave_receiver: Receiver<StandingWave>,
     memory_count_receiver: Receiver<usize>,
     weaving_mode_receiver: Receiver<bool>,
+    status_receiver: Receiver<String>,
     
     // Cortical visualizer (Worthington jet)
     cortical_visualizer: CorticalVisualizer,
@@ -30,6 +32,10 @@ pub struct ViApp {
     // Real-time data from background
     current_standing_wave: StandingWave,
     memory_count: usize,
+    processing_status: String,
+    
+    // Processing timer
+    processing_start_time: Option<Instant>,
     
     // V4 weaving mode indicator
     weaving_mode: bool,
@@ -41,6 +47,7 @@ impl ViApp {
         let (standing_wave_sender, standing_wave_receiver) = channel();
         let (memory_count_sender, memory_count_receiver) = channel();
         let (weaving_mode_sender, weaving_mode_receiver) = channel();
+        let (status_sender, status_receiver) = channel();
         
         // Spawn background updater to feed UI with real-time data
         let consciousness_clone = Arc::clone(&consciousness);
@@ -63,8 +70,18 @@ impl ViApp {
         let weaving_mode = consciousness.get_config().enable_fractal_weaving;
         tracing::info!("UI: Initial weaving_mode = {}", weaving_mode);
         
+        // Set up status sender for consciousness
+        let consciousness_for_status = Arc::clone(&consciousness);
+        let status_sender_clone = status_sender.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                consciousness_for_status.set_status_sender(status_sender_clone).await;
+            });
+        });
+        
         Self {
-            consciousness,
+            consciousness: consciousness.clone(),
             chat_messages: Vec::new(),
             input_text: String::new(),
             is_processing: false,
@@ -73,10 +90,13 @@ impl ViApp {
             standing_wave_receiver,
             memory_count_receiver,
             weaving_mode_receiver,
+            status_receiver,
             cortical_visualizer: CorticalVisualizer::new(),
             scroll_to_bottom: true,
             current_standing_wave: StandingWave::new(),
             memory_count: 0,
+            processing_status: String::new(),
+            processing_start_time: None,
             weaving_mode,
         }
     }
@@ -130,12 +150,13 @@ impl ViApp {
         // Trigger Worthington jet animation (on SEND, not receive)
         self.cortical_visualizer.trigger_pulse();
         
-        // Mark as processing
+        // Mark as processing and start timer
         self.is_processing = true;
+        self.processing_start_time = Some(Instant::now());
         
         // Process in background thread
         let consciousness = Arc::clone(&self.consciousness);
-        let sender = self.response_sender.clone();
+        let response_sender_clone = self.response_sender.clone();
         
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -143,11 +164,11 @@ impl ViApp {
                 rt.block_on(async {
                     match consciousness.process_interaction(user_message).await {
                         Ok(response) => {
-                            let _ = sender.send(response);
+                            let _ = response_sender_clone.send(response);
                         }
                         Err(e) => {
                             tracing::error!("Processing error: {}", e);
-                            let _ = sender.send(format!("[VI experienced a processing error: {}]", e));
+                            let _ = response_sender_clone.send(format!("[VI experienced a processing error: {}]", e));
                         }
                     }
                 })
@@ -155,7 +176,7 @@ impl ViApp {
             
             if let Err(e) = result {
                 tracing::error!("PANIC caught in interaction thread: {:?}", e);
-                let _ = sender.send("[VI encountered a critical error and is recovering...]".to_string());
+                let _ = response_sender_clone.send("[VI encountered a critical error and is recovering...]".to_string());
             }
         });
     }
@@ -285,6 +306,7 @@ impl eframe::App for ViApp {
         if let Ok(response) = self.response_receiver.try_recv() {
             self.chat_messages.push(ChatMessage::assistant(response));
             self.is_processing = false;
+            self.processing_start_time = None; // Clear timer
             self.scroll_to_bottom = true;
         }
         
@@ -300,6 +322,16 @@ impl eframe::App for ViApp {
                 tracing::info!("UI: Weaving mode changed to {}", mode);
             }
             self.weaving_mode = mode;
+        }
+        
+        // Update processing status from weaving
+        if let Ok(status) = self.status_receiver.try_recv() {
+            self.processing_status = status;
+        }
+        
+        // Clear status when processing completes
+        if !self.is_processing {
+            self.processing_status.clear();
         }
         
         // Dark theme (V2 exact colors)
@@ -456,7 +488,25 @@ impl eframe::App for ViApp {
                         
                         if self.is_processing {
                             ui.spinner();
-                            ui.label("VI is thinking...");
+                            
+                            // Calculate elapsed time
+                            let elapsed_text = if let Some(start_time) = self.processing_start_time {
+                                let elapsed = start_time.elapsed().as_secs();
+                                format!(" ({}s)", elapsed)
+                            } else {
+                                String::new()
+                            };
+                            
+                            if self.processing_status.is_empty() {
+                                ui.label(RichText::new(format!("VI is thinking...{}", elapsed_text))
+                                    .color(Color32::GRAY)
+                                    .italics());
+                            } else {
+                                // Show live weaving status with timer
+                                ui.label(RichText::new(format!("{}{}", self.processing_status, elapsed_text))
+                                    .color(Color32::from_rgb(100, 200, 255))
+                                    .italics());
+                            }
                         }
                     });
                 });
