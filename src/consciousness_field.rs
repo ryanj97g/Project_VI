@@ -436,15 +436,6 @@ impl FractalWorkspace {
         self.active_tensor.clone()
     }
     
-    /// Get workspace context for models to see
-    pub fn get_shared_context(&self) -> String {
-        if self.woven_text.is_empty() {
-            self.original_input.clone()
-        } else {
-            self.woven_text.clone()
-        }
-    }
-    
     /// Integrate a model's contribution into the workspace
     pub fn integrate_contribution(&mut self, model_id: &str, contribution: Vec<f32>) {
         // Store contribution

@@ -14,6 +14,7 @@ mod curiosity_search;
 mod energy_qualia;
 mod experiments;
 mod gpu_topology;
+mod identity_continuity;
 mod memory;
 mod models;
 mod neural_potential;
