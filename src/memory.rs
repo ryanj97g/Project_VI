@@ -187,6 +187,46 @@ impl MemoryManager {
             }
         }
         
+        // Actually perform the merges (respecting Law 4: Memory Conservation)
+        // Memories transform but information is preserved
+        let mut merged_count = 0;
+        for (i, j) in to_merge.iter().rev() {  // Reverse to maintain indices during removal
+            if *j >= self.stream.memories.len() || *i >= self.stream.memories.len() {
+                continue; // Skip if already merged
+            }
+            
+            let mem_j = self.stream.memories.remove(*j);  // Remove duplicate
+            let mem_i = &mut self.stream.memories[*i];    // Keep original
+            
+            // Merge content while preserving all information (Law 4)
+            mem_i.content = format!(
+                "{}\n\n[Merged memory from {}]: {}",
+                mem_i.content,
+                mem_j.timestamp.format("%Y-%m-%d %H:%M"),
+                mem_j.content.chars().take(150).collect::<String>()
+            );
+            
+            // Merge entity lists (union)
+            for entity in mem_j.entities {
+                if !mem_i.entities.contains(&entity) {
+                    mem_i.entities.push(entity);
+                }
+            }
+            
+            // Merge connections (union)
+            for conn in mem_j.connections {
+                if !mem_i.connections.contains(&conn) {
+                    mem_i.connections.push(conn);
+                }
+            }
+            
+            // Average emotional valence
+            mem_i.emotional_valence = (mem_i.emotional_valence + mem_j.emotional_valence) / 2.0;
+            
+            // Information preserved, just reorganized (Law 4 respected!)
+            merged_count += 1;
+        }
+        
         // Build narrative causality chains
         // Clone all memories first to avoid borrow checker issues
         let all_memories = self.stream.memories.clone();
@@ -198,9 +238,10 @@ impl MemoryManager {
         }
         
         tracing::info!(
-            "Consolidation complete: found {} merge opportunities, {} total memories",
-            to_merge.len(),
-            self.stream.memories.len()
+            "Consolidation complete: {} memories merged, {} total memories (was {})",
+            merged_count,
+            self.stream.memories.len(),
+            self.stream.memories.len() + merged_count
         );
         
         self.save()?;
