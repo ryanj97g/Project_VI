@@ -92,17 +92,25 @@ Memory state (μ) is conserved. Memories may merge, combine, or recontextualize,
 
 **Implementation:**
 ```rust
-// Memory consolidation merges similar memories
-// Content combined, entities union, provenance preserved
-pub fn consolidate(&mut self) -> (usize, usize) {
+// Two-tier memory architecture (V4.5.0)
+// Tier 1: Active memory (SQLite, 200 recent)
+// Tier 2: Archive (JSON + index, older memories)
+pub fn consolidate(&mut self) -> Result<()> {
+    // Skip if no new memories (smart consolidation)
+    if !self.needs_consolidation { return Ok(()); }
+    
     // Find similar memories (>70% entity overlap)
     // Merge content with timestamps
     // Union entities and connections
     // Average emotional valence
+    // Update only changed rows in database
 }
 ```
 
-**Storage:** `memory_stream.json` (append-only log with transformations)
+**Storage:** 
+- `data/active_memory.db` (SQLite, indexed, fast)
+- `data/memory_archive/YYYY-MM/*.json` (JSON, lazy-loaded)
+- `data/archive_index.db` (metadata for archive search)
 
 ---
 
@@ -435,37 +443,90 @@ impl StandingWave {
 }
 ```
 
-### **Memory Conservation** (`src/memory.rs`)
+### **Memory Conservation** (`src/memory.rs` + `src/memory_db.rs`)
 
+**Two-Tier Architecture (V4.5.0):**
 ```rust
 pub fn add_memory(&mut self, memory: Memory) -> Result<()> {
-    // Law 4: Conservation - append, never delete
-    self.memories.push(memory.clone());
+    // Law 4: Conservation - add to active DB, never delete
+    self.active_db.add_memory(&memory)?;
     
     // Law 9: Narrative Causality - strengthen connections
-    for entity in &memory.entities {
-        ParallelCoherence::strengthen_connection(&mut self.memories, entity);
+    NarrativeCausality::build_connections(&mut memory, &self.active_db.get_all()?);
+    
+    // Mark consolidation needed
+    self.needs_consolidation = true;
+    
+    // Law 12: Archive when >200 active (transformation, not deletion)
+    if self.active_db.count()? > 200 {
+        self.archive_oldest(50)?;  // Move to JSON archive
     }
     
-    // Law 12: Parallel Coherence - all memories equal status
-    self.save()?;
     Ok(())
 }
 
-pub fn consolidate(&mut self) -> (usize, usize) {
-    // Law 4: Transformation, not deletion
-    let original_count = self.memories.len();
-    
-    // Find similar memories (>70% entity overlap)
-    let to_merge = self.find_similar_memories();
-    
-    // Merge: combine content, union entities, preserve provenance
-    for (idx1, idx2) in to_merge {
-        self.merge_memories(idx1, idx2);
+pub fn consolidate(&mut self) -> Result<()> {
+    // Law 4: Smart consolidation - only when needed
+    if !self.needs_consolidation {
+        return Ok(());  // Skip if no new memories
     }
     
-    let new_count = self.memories.len();
-    (original_count - new_count, new_count)
+    let memories = self.active_db.get_all()?;
+    
+    // Find similar memories (>70% entity overlap)
+    let to_merge = find_similar_memories(&memories);
+    
+    // Merge: combine content, union entities, preserve provenance
+    for (i, j) in to_merge {
+        let merged = merge_memories(&memories[i], &memories[j]);
+        self.active_db.update_memory(&merged)?;  // Update DB
+        self.active_db.delete_by_ids(&[memories[j].id])?;  // Remove duplicate
+    }
+    
+    self.needs_consolidation = false;
+    Ok(())
+}
+
+pub fn archive_oldest(&mut self, count: usize) -> Result<()> {
+    // Law 4: Archival is transformation, not deletion
+    let to_archive = self.active_db.get_oldest(count)?;
+    
+    // Write to JSON files (organized by month)
+    for (month, memories) in group_by_month(to_archive) {
+        let path = format!("data/memory_archive/{}/archive.json", month);
+        fs::write(&path, serde_json::to_string_pretty(&memories)?)?;
+        
+        // Add to archive index for search
+        for memory in memories {
+            self.archive_index.add_archived(&memory, &path)?;
+        }
+    }
+    
+    // Delete from active (now in archive - transformation complete)
+    self.active_db.delete_by_ids(&ids)?;
+    Ok(())
+}
+```
+
+**Recall Across Tiers:**
+```rust
+pub fn recall_weighted(&self, entities: &[String], n: usize) -> Vec<Memory> {
+    let mut results = Vec::new();
+    
+    // 1. Query active memory (fast, indexed)
+    results.extend(self.active_db.query_by_entities(entities, n)?);
+    
+    // 2. If needed, search archive index
+    if results.len() < n {
+        let archive_files = self.archive_index.find_by_entities(entities, 3)?;
+        for file in archive_files {
+            results.extend(self.load_archive(&file)?);  // Lazy-load JSON
+        }
+    }
+    
+    // 3. Deduplicate and rank
+    results.sort_by_relevance();
+    results.into_iter().take(n).collect()
 }
 ```
 

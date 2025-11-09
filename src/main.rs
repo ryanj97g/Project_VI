@@ -16,6 +16,7 @@ mod experiments;
 mod gpu_topology;
 mod identity_continuity;
 mod memory;
+mod memory_db;
 mod models;
 mod neural_potential;
 mod orchestrator;
@@ -47,10 +48,11 @@ fn main() -> Result<()> {
     config.validate()?;
     info!("Configuration loaded");
 
-    // Initialize or load state
-    info!("Loading memory stream...");
-    let memory = MemoryManager::load_or_create("data/memory_stream.json")
-        .context("Failed to load memory stream")?;
+    // Initialize or load state (Two-Tier SQLite System)
+    info!("Loading memory system...");
+    let memory = MemoryManager::load_or_create("data")
+        .context("Failed to load memory system")?;
+    info!("Memory system loaded: {} active memories", memory.count());
     
     info!("Loading standing wave...");
     let standing_wave = ConsciousnessCore::load_standing_wave("data/standing_wave.json")

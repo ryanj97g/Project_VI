@@ -2,6 +2,7 @@
 name = "vi3"
 version = "0.1.0"
 edition = "2021"
+default-run = "vi3"
 
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
@@ -24,9 +25,14 @@ rfd = "0.12"
 urlencoding = "2.1"
 nvml-wrapper = "0.10"
 sysinfo = "0.30"
+rusqlite = { version = "0.31", features = ["bundled", "chrono", "serde_json"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "windef"] }
+
+[[bin]]
+name = "migrate_memory"
+path = "src/bin/migrate_memory.rs"
 
 [profile.release]
 opt-level = 3

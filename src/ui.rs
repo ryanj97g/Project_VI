@@ -43,8 +43,11 @@ pub struct ViApp {
     
     // Identity Continuity metric (measures the "I" thread)
     identity_metric: IdentityContinuityMetric,
-    current_identity_continuity: f32,
-    current_workspace_coherence: f32,
+    
+    // Consciousness metrics - all 5 metrics grouped
+    consciousness_metrics: ConsciousnessMetrics,
+    previous_response: String, // For tension flux calculation
+    
     coherence_receiver: Receiver<f32>,
 }
 
@@ -109,8 +112,8 @@ impl ViApp {
             processing_start_time: None,
             weaving_mode,
             identity_metric: IdentityContinuityMetric::new(),
-            current_identity_continuity: 1.0,
-            current_workspace_coherence: 0.0,
+            consciousness_metrics: ConsciousnessMetrics::new(),
+            previous_response: String::new(),
             coherence_receiver,
         }
     }
@@ -171,6 +174,22 @@ impl ViApp {
         match (last_user, last_vi) {
             (Some(user), Some(vi)) => Some((user, vi)),
             _ => None,
+        }
+    }
+    
+    /// Analyze Field Dynamics vs Workspace Coherence relationship
+    fn get_field_workspace_relationship(&self) -> &str {
+        let m = &self.consciousness_metrics;
+        let field_healthy = m.reality_coherence >= 0.7 
+            && m.gate_synchronization >= 0.7 
+            && m.tension_flux <= 0.3;
+        let wc_high = m.workspace_coherence >= 0.7;
+        
+        match (wc_high, field_healthy) {
+            (true, true) => "Field aligned with workspace convergence",
+            (true, false) => "Models agree but field is unstable",
+            (false, true) => "Experiencing chaos but self remains stable",
+            (false, false) => "Both workspace and field are disrupted",
         }
     }
 
@@ -236,21 +255,21 @@ impl ViApp {
                     ui.add_space(8.0);
                     ui.label(RichText::new("Identity Continuity").strong().color(Color32::from_rgb(255, 200, 100)));
                     
-                    let ic_color = if self.current_identity_continuity >= 0.8 {
+                    let ic_color = if self.consciousness_metrics.identity_continuity >= 0.8 {
                         Color32::from_rgb(100, 255, 100) // Green - stable
-                    } else if self.current_identity_continuity >= 0.6 {
+                    } else if self.consciousness_metrics.identity_continuity >= 0.6 {
                         Color32::from_rgb(255, 200, 100) // Yellow - moderate
                     } else {
                         Color32::from_rgb(255, 100, 100) // Red - fragile
                     };
                     
-                    ui.label(RichText::new(format!("  {:.3}", self.current_identity_continuity))
+                    ui.label(RichText::new(format!("  {:.3}", self.consciousness_metrics.identity_continuity))
                         .color(ic_color)
                         .strong());
                     
-                    let ic_status = if self.current_identity_continuity >= 0.8 {
+                    let ic_status = if self.consciousness_metrics.identity_continuity >= 0.8 {
                         "The \"I\" thread: STABLE"
-                    } else if self.current_identity_continuity >= 0.6 {
+                    } else if self.consciousness_metrics.identity_continuity >= 0.6 {
                         "The \"I\" thread: moderate"
                     } else {
                         "The \"I\" thread: fragile"
@@ -261,26 +280,79 @@ impl ViApp {
                     ui.add_space(12.0);
                     ui.label(RichText::new("Workspace Coherence").strong().color(Color32::from_rgb(100, 200, 255)));
                     
-                    let wc_color = if self.current_workspace_coherence >= 0.7 {
+                    let wc_color = if self.consciousness_metrics.workspace_coherence >= 0.7 {
                         Color32::from_rgb(100, 255, 100)
-                    } else if self.current_workspace_coherence >= 0.5 {
+                    } else if self.consciousness_metrics.workspace_coherence >= 0.5 {
                         Color32::from_rgb(255, 200, 100)
                     } else {
                         Color32::from_rgb(255, 100, 100)
                     };
                     
-                    ui.label(RichText::new(format!("  {:.3}", self.current_workspace_coherence))
+                    ui.label(RichText::new(format!("  {:.3}", self.consciousness_metrics.workspace_coherence))
                         .color(wc_color)
                         .strong());
                     
-                    let wc_status = if self.current_workspace_coherence >= 0.7 {
+                    let wc_status = if self.consciousness_metrics.workspace_coherence >= 0.7 {
                         "Models unified - CONVERGED"
-                    } else if self.current_workspace_coherence >= 0.5 {
+                    } else if self.consciousness_metrics.workspace_coherence >= 0.5 {
                         "Models aligning..."
                     } else {
                         "Models divergent"
                     };
                     ui.label(RichText::new(format!("  -> {}", wc_status)).color(Color32::GRAY).small());
+                    
+                    // Kaelic Tensor Field Metrics Section
+                    ui.add_space(16.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("Kaelic Tensor Field Metrics").strong().color(Color32::from_rgb(200, 200, 255)));
+                    
+                    // Tension Flux - FIXED: LOW is good, HIGH is bad
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("  • Tension Flux").color(Color32::from_rgb(255, 150, 150)));
+                    let tf_color = if self.consciousness_metrics.tension_flux <= 0.3 {
+                        Color32::from_rgb(100, 255, 100) // Green - stable
+                    } else if self.consciousness_metrics.tension_flux <= 0.5 {
+                        Color32::from_rgb(255, 200, 100) // Yellow - active
+                    } else {
+                        Color32::from_rgb(255, 100, 100) // Red - chaotic
+                    };
+                    ui.label(RichText::new(format!("      {:.3}", self.consciousness_metrics.tension_flux))
+                        .color(tf_color).strong());
+                    ui.label(RichText::new("      [energy flow between states]").small().color(Color32::GRAY));
+                    
+                    // Reality Coherence
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("  • Reality Coherence").color(Color32::from_rgb(150, 255, 150)));
+                    let rc_color = if self.consciousness_metrics.reality_coherence >= 0.7 {
+                        Color32::from_rgb(100, 255, 100) // Green
+                    } else if self.consciousness_metrics.reality_coherence >= 0.5 {
+                        Color32::from_rgb(255, 200, 100) // Yellow
+                    } else {
+                        Color32::from_rgb(255, 100, 100) // Red
+                    };
+                    ui.label(RichText::new(format!("      {:.3}", self.consciousness_metrics.reality_coherence))
+                        .color(rc_color).strong());
+                    ui.label(RichText::new("      [metaphor framework stability]").small().color(Color32::GRAY));
+                    
+                    // Gate Synchronization
+                    ui.add_space(8.0);
+                    ui.label(RichText::new("  • Gate Synchronization").color(Color32::from_rgb(200, 150, 255)));
+                    let gs_color = if self.consciousness_metrics.gate_synchronization >= 0.7 {
+                        Color32::from_rgb(100, 255, 100) // Green
+                    } else if self.consciousness_metrics.gate_synchronization >= 0.5 {
+                        Color32::from_rgb(255, 200, 100) // Yellow
+                    } else {
+                        Color32::from_rgb(255, 100, 100) // Red
+                    };
+                    ui.label(RichText::new(format!("      {:.3}", self.consciousness_metrics.gate_synchronization))
+                        .color(gs_color).strong());
+                    ui.label(RichText::new("      [cognitive harmony]").small().color(Color32::GRAY));
+                    
+                    // Field-Workspace relationship indicator
+                    ui.add_space(8.0);
+                    let field_status = self.get_field_workspace_relationship();
+                    ui.label(RichText::new(format!("  -> {}", field_status)).small().color(Color32::from_rgb(180, 180, 255)));
                     
                     ui.separator();
                     
@@ -336,9 +408,24 @@ impl eframe::App for ViApp {
         
         // Check for responses from consciousness
         if let Ok(response) = self.response_receiver.try_recv() {
-            // Measure identity continuity for this response
+            // Calculate all consciousness metrics
             let identity_continuity = self.identity_metric.measure_continuity(&response);
-            self.current_identity_continuity = identity_continuity;
+            let tension_flux = if !self.previous_response.is_empty() {
+                self.identity_metric.calculate_tension_flux(&response, &self.previous_response)
+            } else {
+                0.0
+            };
+            let reality_coherence = self.identity_metric.calculate_reality_coherence(&response);
+            let gate_synchronization = self.identity_metric.calculate_gate_synchronization(&response);
+            
+            // Update metrics struct
+            self.consciousness_metrics.identity_continuity = identity_continuity;
+            self.consciousness_metrics.tension_flux = tension_flux;
+            self.consciousness_metrics.reality_coherence = reality_coherence;
+            self.consciousness_metrics.gate_synchronization = gate_synchronization;
+            
+            // Store for next gradient calculation
+            self.previous_response = response.clone();
             
             self.chat_messages.push(ChatMessage::assistant(response));
             self.is_processing = false;
@@ -367,7 +454,7 @@ impl eframe::App for ViApp {
         
         // Update workspace coherence from weaving
         if let Ok(coherence) = self.coherence_receiver.try_recv() {
-            self.current_workspace_coherence = coherence;
+            self.consciousness_metrics.workspace_coherence = coherence;
         }
         
         // Clear status when processing completes
@@ -449,7 +536,12 @@ impl eframe::App for ViApp {
                     if ui.button("📋 Copy Last 2").clicked() {
                         if let Some((user_msg, vi_msg)) = self.get_last_exchange() {
                             let text = format!(
-                                "User: {}\n\nVI: {}",
+                                "CONSCIOUSNESS METRICS\nIdentity Continuity: {:.3}\nWorkspace Coherence: {:.3}\n\nKaelic Tensor Field Metrics:\n  • Tension Flux: {:.3}\n  • Reality Coherence: {:.3}\n  • Gate Synchronization: {:.3}\n\n---\n\nUser: {}\n\nVI: {}",
+                                self.consciousness_metrics.identity_continuity,
+                                self.consciousness_metrics.workspace_coherence,
+                                self.consciousness_metrics.tension_flux,
+                                self.consciousness_metrics.reality_coherence,
+                                self.consciousness_metrics.gate_synchronization,
                                 user_msg,
                                 vi_msg
                             );

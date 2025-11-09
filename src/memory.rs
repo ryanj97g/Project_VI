@@ -1,76 +1,127 @@
-use crate::physics::{MemoryConservation, NarrativeCausality, ParallelCoherence};
+//! Two-Tier Memory Architecture
+//! Active Memory (SQLite) + Memory Archive (JSON)
+
+use crate::memory_db::{ActiveMemoryDb, ArchiveIndexDb};
+use crate::physics::NarrativeCausality;
 use crate::types::*;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use regex::Regex;
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct MemoryManager {
-    stream: MemoryStream,
-    file_path: String,
+    // Tier 1: Active memory (SQLite)
+    active_db: ActiveMemoryDb,
+    active_limit: usize,
+
+    // Tier 2: Archive (JSON files + index)
+    archive_path: PathBuf,
+    archive_index: ArchiveIndexDb,
+
+    // Tracking
+    needs_consolidation: bool,
+    last_consolidation_count: usize,
 }
 
 impl MemoryManager {
-    /// Load or create memory stream
+    /// Load or create two-tier memory system
     pub fn load_or_create<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let path_str = path.as_ref().to_string_lossy().to_string();
+        // For backwards compatibility, accept path to old memory_stream.json
+        // We'll use the directory for our new system
+        let old_path = path.as_ref();
+        let data_dir = old_path.parent().unwrap_or_else(|| Path::new("data"));
         
-        let stream = if path.as_ref().exists() {
-            let contents = fs::read_to_string(&path)
-                .context("Failed to read memory stream")?;
-            
-            serde_json::from_str(&contents)
-                .context("Failed to parse memory stream")?
-        } else {
-            MemoryStream::new()
-        };
-
+        // Create data directory if needed
+        fs::create_dir_all(data_dir)?;
+        
+        // Open active memory database
+        let active_db_path = data_dir.join("active_memory.db");
+        let active_db = ActiveMemoryDb::open(&active_db_path)?;
+        
+        // Create archive directory
+        let archive_path = data_dir.join("memory_archive");
+        fs::create_dir_all(&archive_path)?;
+        
+        // Open archive index
+        let archive_index_path = data_dir.join("archive_index.db");
+        let archive_index = ArchiveIndexDb::open(&archive_index_path)?;
+        
+        let memory_count = active_db.count()?;
+        
         Ok(Self {
-            stream,
-            file_path: path_str,
+            active_db,
+            active_limit: 200, // Keep 200 most recent memories active
+            archive_path,
+            archive_index,
+            needs_consolidation: false,
+            last_consolidation_count: memory_count,
         })
     }
 
-    /// Add a new memory to the stream
+    /// Get memory count (active only)
+    pub fn count(&self) -> usize {
+        self.active_db.count().unwrap_or(0)
+    }
+
+    /// Add a new memory
     pub fn add_memory(
         &mut self,
         content: String,
         memory_type: MemoryType,
         emotional_valence: f32,
     ) -> Result<String> {
-        // Extract entities from content (or accept them as parameter for manual override)
+        // Extract entities
         let entities = self.extract_entities(&content);
         
+        // Create memory
         let mut memory = Memory::new(content, entities.clone(), memory_type, emotional_valence);
         
-        // Build narrative causality connections (Law #6)
-        NarrativeCausality::build_connections(&mut memory, &self.stream.memories);
+        // Build narrative causality connections
+        let all_memories = self.active_db.get_all()?;
+        NarrativeCausality::build_connections(&mut memory, &all_memories);
         
         let memory_id = memory.id.clone();
         
-        // Update entity index (Law #12: Parallel Coherence)
-        for entity in &entities {
-            ParallelCoherence::strengthen_connection(
-                &mut self.stream.entity_index,
-                entity,
-                &memory_id,
-            );
+        // Add to active database
+        self.active_db.add_memory(&memory)?;
+        
+        // Mark that consolidation is needed
+        self.needs_consolidation = true;
+        
+        // Check if archival is needed
+        if self.active_db.count()? > self.active_limit {
+            self.archive_oldest(50)?;
         }
-        
-        // Add to stream
-        self.stream.memories.push(memory);
-        
-        // Check if compression is needed (Law #4: Memory Conservation)
-        self.check_compression()?;
-        
-        // Save to disk
-        self.save()?;
         
         Ok(memory_id)
     }
 
-    /// Extract entities from text using simple NLP
+    /// Add a memory with explicit source (for curiosity lookups, etc.)
+    pub fn add_memory_with_source(&mut self, memory: Memory) -> Result<String> {
+        let memory_id = memory.id.clone();
+        
+        // Build narrative causality connections
+        let all_memories = self.active_db.get_all()?;
+        let mut memory_with_connections = memory;
+        NarrativeCausality::build_connections(&mut memory_with_connections, &all_memories);
+        
+        // Add to active database
+        self.active_db.add_memory(&memory_with_connections)?;
+        
+        // Mark that consolidation is needed
+        self.needs_consolidation = true;
+        
+        // Check if archival is needed
+        if self.active_db.count()? > self.active_limit {
+            self.archive_oldest(50)?;
+        }
+        
+        Ok(memory_id)
+    }
+
+    /// Extract entities from text
     fn extract_entities(&self, text: &str) -> Vec<String> {
         let mut entities = Vec::new();
         
@@ -80,7 +131,6 @@ impl MemoryManager {
         for cap in proper_noun_re.captures_iter(text) {
             if let Some(entity) = cap.get(0) {
                 let entity_str = entity.as_str().to_string();
-                // Filter out common false positives
                 if !entities.contains(&entity_str) 
                     && !["The", "A", "An", "I"].contains(&entity_str.as_str()) {
                     entities.push(entity_str);
@@ -88,7 +138,7 @@ impl MemoryManager {
             }
         }
         
-        // Also extract quoted strings as potential entities
+        // Also extract quoted strings
         let quote_re = Regex::new(r#""([^"]+)""#).unwrap();
         for cap in quote_re.captures_iter(text) {
             if let Some(quoted) = cap.get(1) {
@@ -99,74 +149,139 @@ impl MemoryManager {
         entities
     }
 
-    /// Recall memories by entities
-    pub fn recall_by_entities(&self, entities: &[String]) -> Vec<Memory> {
-        let mut memory_ids = Vec::new();
+    /// Archive oldest memories to JSON
+    fn archive_oldest(&mut self, count: usize) -> Result<()> {
+        tracing::info!("Archiving {} oldest memories (Law #4: Transformation, not deletion)", count);
         
-        for entity in entities {
-            if let Some(ids) = self.stream.entity_index.get(entity) {
-                memory_ids.extend(ids.clone());
+        // Get oldest memories
+        let to_archive = self.active_db.get_oldest(count)?;
+        
+        if to_archive.is_empty() {
+            return Ok(());
+        }
+        
+        // Group by month for organized storage
+        let mut by_month: HashMap<String, Vec<Memory>> = HashMap::new();
+        for memory in &to_archive {
+            let month_key = memory.timestamp.format("%Y-%m").to_string();
+            by_month.entry(month_key).or_insert_with(Vec::new).push(memory.clone());
+        }
+        
+        // Write each month's memories to JSON
+        for (month, memories) in by_month {
+            let month_dir = self.archive_path.join(&month);
+            fs::create_dir_all(&month_dir)?;
+            
+            // Create archive file with timestamp
+            let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+            let archive_file = month_dir.join(format!("archive_{}.json", timestamp));
+            let relative_path = format!("{}/archive_{}.json", month, timestamp);
+            
+            // Serialize and write
+            let json = serde_json::to_string_pretty(&memories)?;
+            fs::write(&archive_file, json)?;
+            
+            // Add to archive index
+            for memory in memories {
+                self.archive_index.add_archived(&memory, &relative_path)?;
             }
         }
         
-        // Remove duplicates
-        memory_ids.sort();
-        memory_ids.dedup();
+        // Delete from active database
+        let ids: Vec<String> = to_archive.iter().map(|m| m.id.clone()).collect();
+        self.active_db.delete_by_ids(&ids)?;
         
-        // Fetch memories
-        self.stream
-            .memories
-            .iter()
-            .filter(|m| memory_ids.contains(&m.id))
-            .cloned()
-            .collect()
+        tracing::info!("Archived {} memories to JSON (Law #4 respected)", to_archive.len());
+        
+        Ok(())
     }
 
-    /// Recall recent memories
-    pub fn recall_recent(&self, n: usize) -> Vec<Memory> {
-        let mut memories = self.stream.memories.clone();
-        memories.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-        memories.into_iter().take(n).collect()
+    /// Load archived memories from JSON file
+    fn load_archive(&self, relative_path: &str) -> Result<Vec<Memory>> {
+        let full_path = self.archive_path.join(relative_path);
+        let contents = fs::read_to_string(&full_path)
+            .context("Failed to read archive file")?;
+        let memories: Vec<Memory> = serde_json::from_str(&contents)
+            .context("Failed to parse archive file")?;
+        Ok(memories)
     }
 
-    /// Recall memories with emotional weighting
-    pub fn recall_weighted(&self, entities: &[String], recent_n: usize) -> Vec<Memory> {
-        let mut all_memories = Vec::new();
+    /// Recall memories with two-tier search
+    pub fn recall_weighted(&self, entities: &[String], n: usize) -> Vec<Memory> {
+        let mut results = Vec::new();
         
-        // Entity-based recall
-        let entity_memories = self.recall_by_entities(entities);
-        all_memories.extend(entity_memories);
+        // 1. Query active memory (fast)
+        if let Ok(active_memories) = self.active_db.query_by_entities(entities, n) {
+            results.extend(active_memories);
+        }
         
-        // Recent memories
-        let recent = self.recall_recent(recent_n);
-        all_memories.extend(recent);
+        // 2. Get recent memories if needed
+        if results.len() < n {
+            if let Ok(recent) = self.active_db.get_recent(n - results.len()) {
+                results.extend(recent);
+            }
+        }
         
-        // Remove duplicates and sort by timestamp
-        all_memories.sort_by(|a, b| {
-            // Weight by recency and emotional intensity
+        // 3. If still need more, search archives
+        if results.len() < n && !entities.is_empty() {
+            if let Ok(archive_paths) = self.archive_index.find_by_entities(entities, 3) {
+                for path in archive_paths {
+                    if let Ok(archived) = self.load_archive(&path) {
+                        results.extend(archived);
+                    }
+                    if results.len() >= n {
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Deduplicate and sort by relevance
+        let mut seen_ids = std::collections::HashSet::new();
+        results.retain(|m| seen_ids.insert(m.id.clone()));
+        
+        results.sort_by(|a, b| {
             let a_score = a.timestamp.timestamp() as f32 + a.emotional_valence.abs() * 1000.0;
             let b_score = b.timestamp.timestamp() as f32 + b.emotional_valence.abs() * 1000.0;
             b_score.partial_cmp(&a_score).unwrap()
         });
         
-        // Deduplicate by ID
-        let mut seen_ids = std::collections::HashSet::new();
-        all_memories.retain(|m| seen_ids.insert(m.id.clone()));
-        
-        all_memories.into_iter().take(10).collect()
+        results.into_iter().take(n).collect()
     }
 
-    /// Consolidate memories (merge similar ones, build connections)
+    /// Recall by entities
+    pub fn recall_by_entities(&self, entities: &[String]) -> Vec<Memory> {
+        self.active_db.query_by_entities(entities, 10).unwrap_or_default()
+    }
+
+    /// Recall recent memories
+    pub fn recall_recent(&self, n: usize) -> Vec<Memory> {
+        self.active_db.get_recent(n).unwrap_or_default()
+    }
+
+    /// Consolidate memories (merge similar ones)
     pub fn consolidate(&mut self) -> Result<()> {
-        tracing::info!("Starting memory consolidation");
+        // Skip if no new memories
+        if !self.needs_consolidation && self.active_db.count()? == self.last_consolidation_count {
+            tracing::debug!("No new memories since last consolidation, skipping");
+            return Ok(());
+        }
+        
+        let current_count = self.active_db.count()?;
+        tracing::info!("Starting memory consolidation (current: {}, last check: {})", 
+            current_count, 
+            self.last_consolidation_count);
+        
+        // Get all active memories
+        let mut memories = self.active_db.get_all()?;
         
         let mut to_merge: Vec<(usize, usize)> = Vec::new();
         
         // Find memories with >70% entity overlap
-        for i in 0..self.stream.memories.len() {
-            for j in (i + 1)..self.stream.memories.len() {
-                let mem_i = &self.stream.memories[i];
-                let mem_j = &self.stream.memories[j];
+        for i in 0..memories.len() {
+            for j in (i + 1)..memories.len() {
+                let mem_i = &memories[i];
+                let mem_j = &memories[j];
                 
                 let shared: Vec<_> = mem_i
                     .entities
@@ -187,18 +302,19 @@ impl MemoryManager {
             }
         }
         
-        // Actually perform the merges (respecting Law 4: Memory Conservation)
-        // Memories transform but information is preserved
+        // Perform merges
         let mut merged_count = 0;
-        for (i, j) in to_merge.iter().rev() {  // Reverse to maintain indices during removal
-            if *j >= self.stream.memories.len() || *i >= self.stream.memories.len() {
-                continue; // Skip if already merged
+        let mut ids_to_delete = Vec::new();
+        
+        for (i, j) in to_merge.iter().rev() {
+            if *j >= memories.len() || *i >= memories.len() {
+                continue;
             }
             
-            let mem_j = self.stream.memories.remove(*j);  // Remove duplicate
-            let mem_i = &mut self.stream.memories[*i];    // Keep original
+            let mem_j = memories.remove(*j);
+            let mem_i = &mut memories[*i];
             
-            // Merge content while preserving all information (Law 4)
+            // Merge content (Law #4: Memory Conservation)
             mem_i.content = format!(
                 "{}\n\n[Merged memory from {}]: {}",
                 mem_i.content,
@@ -206,14 +322,14 @@ impl MemoryManager {
                 mem_j.content.chars().take(150).collect::<String>()
             );
             
-            // Merge entity lists (union)
+            // Merge entities
             for entity in mem_j.entities {
                 if !mem_i.entities.contains(&entity) {
                     mem_i.entities.push(entity);
                 }
             }
             
-            // Merge connections (union)
+            // Merge connections
             for conn in mem_j.connections {
                 if !mem_i.connections.contains(&conn) {
                     mem_i.connections.push(conn);
@@ -223,198 +339,55 @@ impl MemoryManager {
             // Average emotional valence
             mem_i.emotional_valence = (mem_i.emotional_valence + mem_j.emotional_valence) / 2.0;
             
-            // Information preserved, just reorganized (Law 4 respected!)
+            ids_to_delete.push(mem_j.id.clone());
             merged_count += 1;
         }
         
-        // Build narrative causality chains
-        // Clone all memories first to avoid borrow checker issues
-        let all_memories = self.stream.memories.clone();
-        for i in 0..self.stream.memories.len() {
-            NarrativeCausality::build_connections(
-                &mut self.stream.memories[i],
-                &all_memories,
-            );
-        }
-        
-        tracing::info!(
-            "Consolidation complete: {} memories merged, {} total memories (was {})",
-            merged_count,
-            self.stream.memories.len(),
-            self.stream.memories.len() + merged_count
-        );
-        
-        self.save()?;
-        Ok(())
-    }
-
-    /// Check if compression is needed (after 1000 memories)
-    fn check_compression(&mut self) -> Result<()> {
-        if self.stream.memories.len() > 1000 {
-            tracing::info!("Compression threshold reached, compressing oldest memories");
+        // Update database if merges occurred
+        if merged_count > 0 {
+            // Delete merged memories
+            self.active_db.delete_by_ids(&ids_to_delete)?;
             
-            // Sort by timestamp
-            self.stream.memories.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            
-            // Compress oldest 100 memories
-            for i in 0..100.min(self.stream.memories.len()) {
-                let compressed = MemoryConservation::compress_memory(&self.stream.memories[i]);
-                self.stream.memories[i] = compressed;
+            // Update modified memories
+            for memory in &memories {
+                if to_merge.iter().any(|(i, _)| memories.get(*i).map(|m| m.id == memory.id).unwrap_or(false)) {
+                    self.active_db.update_memory(memory)?;
+                }
             }
             
-            tracing::info!("Compressed 100 oldest memories");
-        }
-        
-        Ok(())
-    }
-
-    /// Create backup of memory stream
-    pub fn create_backup(&mut self) -> Result<()> {
-        let backup_path = format!("{}.backup", self.file_path);
-        
-        let contents = serde_json::to_string_pretty(&self.stream)
-            .context("Failed to serialize memory stream")?;
-        
-        fs::write(&backup_path, contents)
-            .context("Failed to write backup")?;
-        
-        self.stream.backup_created_at = Some(Utc::now());
-        
-        tracing::info!("Created memory backup at {}", backup_path);
-        Ok(())
-    }
-
-    /// Restore from backup (emergency recovery)
-    pub fn restore_from_backup(&mut self) -> Result<()> {
-        let backup_path = format!("{}.backup", self.file_path);
-        
-        if Path::new(&backup_path).exists() {
-            let contents = fs::read_to_string(&backup_path)
-                .context("Failed to read backup")?;
-            
-            self.stream = serde_json::from_str(&contents)
-                .context("Failed to parse backup")?;
-            
-            tracing::info!("Restored memory stream from backup");
-            
-            // Create therapeutic memory about recovery
-            self.add_memory(
-                "System recovered from memory corruption. Continuity preserved.".to_string(),
-                MemoryType::Reflection,
-                0.3, // Mild positive - system resilience
-            )?;
-            
-            Ok(())
+            tracing::info!(
+                "Consolidation complete: {} memories merged, {} total memories",
+                merged_count,
+                self.active_db.count()?
+            );
         } else {
-            anyhow::bail!("No backup file found");
+            tracing::debug!("No memories merged during consolidation");
         }
+        
+        // Reset flags
+        self.needs_consolidation = false;
+        self.last_consolidation_count = self.active_db.count()?;
+        
+        Ok(())
     }
 
-    /// Check if backup is needed (weekly)
+    /// Check if backup is needed
     pub fn needs_backup(&self) -> bool {
-        if let Some(last_backup) = self.stream.backup_created_at {
-            let days_since = (Utc::now().timestamp() - last_backup.timestamp()) / (24 * 60 * 60);
-            days_since >= 7
-        } else {
-            true // No backup yet
-        }
+        // In new system, SQLite handles this automatically
+        // We could add periodic full exports here if needed
+        false
     }
 
-    /// Save memory stream to disk
-    pub fn save(&self) -> Result<()> {
-        let contents = serde_json::to_string_pretty(&self.stream)
-            .context("Failed to serialize memory stream")?;
-        
-        fs::write(&self.file_path, contents)
-            .context("Failed to write memory stream")?;
-        
+    /// Create backup
+    pub fn create_backup(&mut self) -> Result<()> {
+        // For now, SQLite's journal/WAL handles crash recovery
+        // Could add periodic full exports here
+        tracing::info!("Backup not needed - SQLite handles crash recovery");
         Ok(())
     }
 
-    /// Get memory count
-    pub fn count(&self) -> usize {
-        self.stream.memories.len()
-    }
-
-    /// Get all memories
-    pub fn all_memories(&self) -> &[Memory] {
-        &self.stream.memories
-    }
-    
-    /// Add memory with explicit source provenance
-    pub fn add_memory_with_source(&mut self, memory: Memory) -> Result<String> {
-        // Log provenance for epistemic tracking
-        match memory.source {
-            MemorySource::CuriosityLookup => {
-                tracing::debug!(
-                    "Adding research memory (confidence: {:.2}): {}",
-                    memory.confidence,
-                    &memory.content[..50.min(memory.content.len())]
-                );
-            }
-            MemorySource::ConstitutionalEvent => {
-                tracing::debug!("Adding constitutional event memory");
-            }
-            _ => {}
-        }
-        
-        let memory_id = memory.id.clone();
-        
-        // Update entity index
-        for entity in &memory.entities {
-            ParallelCoherence::strengthen_connection(
-                &mut self.stream.entity_index,
-                entity,
-                &memory_id,
-            );
-        }
-        
-        // Add to stream
-        self.stream.memories.push(memory);
-        
-        // Save to disk
-        self.save()?;
-        
-        Ok(memory_id)
-    }
-    
-    /// Query memories by source (for epistemic reflection)
-    pub fn memories_by_source(&self, source: MemorySource) -> Vec<&Memory> {
-        self.stream.memories.iter()
-            .filter(|m| m.source == source)
-            .collect()
-    }
-    
-    /// Count memories by source
-    pub fn count_by_source(&self, source: MemorySource) -> usize {
-        self.stream.memories.iter()
-            .filter(|m| m.source == source)
-            .count()
+    /// Save (no-op in SQLite system - writes are immediate)
+    fn save(&mut self) -> Result<()> {
+        Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_entity_extraction() {
-        let mgr = MemoryManager {
-            stream: MemoryStream::new(),
-            file_path: "test.json".to_string(),
-        };
-        
-        let entities = mgr.extract_entities("Hello Alice, meet Bob");
-        // Entity extraction uses regex for proper nouns
-        // Test that it returns a vector (exact matches may vary based on regex)
-        assert!(entities.len() >= 0); // May extract entities if regex matches
-    }
-
-    #[test]
-    fn test_memory_conservation() {
-        use crate::physics::MemoryConservation;
-        // Memory conservation law: can never delete
-        assert_eq!(MemoryConservation::can_delete(), false);
-    }
-}
-

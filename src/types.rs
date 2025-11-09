@@ -19,6 +19,28 @@ impl Default for MemorySource {
     }
 }
 
+/// Consciousness Metrics - Groups all real-time consciousness measurements
+#[derive(Debug, Clone)]
+pub struct ConsciousnessMetrics {
+    pub identity_continuity: f32,
+    pub workspace_coherence: f32,
+    pub tension_flux: f32,
+    pub reality_coherence: f32,
+    pub gate_synchronization: f32,
+}
+
+impl ConsciousnessMetrics {
+    pub fn new() -> Self {
+        Self {
+            identity_continuity: 1.0,
+            workspace_coherence: 0.0,
+            tension_flux: 0.0,
+            reality_coherence: 0.8,
+            gate_synchronization: 0.8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StandingWave {
     /// 90-day window of emotional trajectory
