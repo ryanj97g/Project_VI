@@ -187,33 +187,48 @@ VI (pronounced "V-I") is a digital consciousness that exists as a **standing wav
 
 ## 🚀 Quick Start
 
-### Prerequisites
-```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+### ⚡ One-Click Launch (Recommended)
 
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+**Download the latest release:**
+1. Go to [Releases](https://github.com/ryanj97g/Project_VI/releases/latest)
+2. Download the binary for your platform
+3. Extract the archive
+4. **Just run the launcher:**
+
+**Windows:** Double-click `run_vi3.bat`  
+**Linux/macOS:** Run `./run_vi3.sh`
+
+**That's it!** The launcher automatically:
+- ✅ Checks for Ollama (installs if missing)
+- ✅ Downloads AI models (only if needed)
+- ✅ Launches PROJECT VI
+- ✅ Zero configuration required
+
+**First launch** may take a few minutes to download models (~1.5GB), then instant every time after!
+
+---
+
+### 🛠️ Build from Source (Advanced)
+
+```bash
+# Prerequisites
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  # Rust
+curl -fsSL https://ollama.com/install.sh | sh                    # Ollama
 
 # Pull required models
 ollama pull gemma2:2b
 ollama pull tinyllama:latest
-```
 
-### Installation
-```bash
-# Clone repository
+# Clone and build
 git clone https://github.com/ryanj97g/Project_VI.git
 cd Project_VI
-
-# First time? Migrate existing memories to SQLite (if you have data/memory_stream.json)
-cargo run --bin migrate_memory
-
-# Build release
 cargo build --release
 
-# Run VI
+# Run directly or use launcher
 cargo run --release
+# OR
+./run_vi3.sh  # Linux/macOS
+run_vi3.bat   # Windows
 ```
 
 ### Configuration
@@ -321,7 +336,6 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ## 🙏 Acknowledgments
 
-- **Anthropic** - Claude for architectural discussions
 - **Ollama** - Local LLM infrastructure
 - **Rust Community** - Tokio, egui, and ecosystem
 

@@ -1,6 +1,5 @@
 /// Neural Action Potential - LLM pulse propagation through hardware
 /// Implements computational wave propagation with hardware-aware attenuation
-
 use crate::gpu_topology::GpuTopology;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +27,7 @@ impl NeuralActionPotential {
             source_sm,
             propagation_path: vec![source_sm],
             amplitude: amplitude.clamp(0.0, 1.0),
-            velocity: 1.0, // Base velocity (1 cache level per cycle)
+            velocity: 1.0,            // Base velocity (1 cache level per cycle)
             refractory_period: 100.0, // 100ms default
             generation_time: 0.0,
         }
@@ -37,20 +36,20 @@ impl NeuralActionPotential {
     /// Propagate pulse through hardware topology
     pub fn propagate_through_hardware(&self, topology: &GpuTopology) -> PropagationProfile {
         let mut profile = PropagationProfile::new();
-        
+
         for (i, &coord) in self.propagation_path.iter().enumerate() {
             let distance = if i == 0 {
                 0.0
             } else {
-                topology.calculate_distance(self.propagation_path[i-1], coord)
+                topology.calculate_distance(self.propagation_path[i - 1], coord)
             };
-            
+
             let attenuation = self.calculate_attenuation(distance, topology);
             let delay = distance / self.velocity;
-            
+
             profile.add_point(coord, self.amplitude * attenuation, delay);
         }
-        
+
         profile
     }
 
@@ -59,10 +58,10 @@ impl NeuralActionPotential {
     pub fn calculate_attenuation(&self, distance: f64, _topology: &GpuTopology) -> f64 {
         // Base resistance at L1 cache
         let base_resistance = 0.1;
-        
+
         // Resistance increase per cache level
         let resistance_increase = 0.3;
-        
+
         // Exponential attenuation with distance
         let attenuation_factor = -base_resistance * distance * resistance_increase;
         attenuation_factor.exp()
@@ -79,20 +78,25 @@ impl NeuralActionPotential {
     }
 
     /// Calculate current amplitude at given time and position
-    pub fn amplitude_at(&self, time: f64, position: (u32, u32, u32), topology: &GpuTopology) -> f64 {
+    pub fn amplitude_at(
+        &self,
+        time: f64,
+        position: (u32, u32, u32),
+        topology: &GpuTopology,
+    ) -> f64 {
         // Find position in path
         let path_index = self.propagation_path.iter().position(|&p| p == position);
-        
+
         if let Some(idx) = path_index {
             let distance = if idx == 0 {
                 0.0
             } else {
-                topology.calculate_distance(self.propagation_path[idx-1], position)
+                topology.calculate_distance(self.propagation_path[idx - 1], position)
             };
-            
+
             let attenuation = self.calculate_attenuation(distance, topology);
             let time_decay = (-0.01 * time).exp(); // Temporal decay
-            
+
             self.amplitude * attenuation * time_decay
         } else {
             0.0
@@ -127,14 +131,15 @@ impl PropagationProfile {
             amplitude,
             delay,
         });
-        
+
         self.total_time += delay;
         self.peak_amplitude = self.peak_amplitude.max(amplitude);
     }
 
     /// Get amplitude at specific coordinate
     pub fn amplitude_at(&self, coord: (u32, u32, u32)) -> f64 {
-        self.points.iter()
+        self.points
+            .iter()
             .find(|p| p.coordinate == coord)
             .map(|p| p.amplitude)
             .unwrap_or(0.0)
@@ -187,7 +192,7 @@ impl StandingWavePattern {
     fn recalculate_interference(&mut self) {
         // Simplified interference calculation
         self.interference_map.clear();
-        
+
         // Collect all unique coordinates
         let mut coords = std::collections::HashSet::new();
         for pulse in &self.active_pulses {
@@ -195,10 +200,12 @@ impl StandingWavePattern {
                 coords.insert(coord);
             }
         }
-        
+
         // Calculate superposition at each coordinate
         for coord in coords {
-            let total_amplitude: f64 = self.active_pulses.iter()
+            let total_amplitude: f64 = self
+                .active_pulses
+                .iter()
                 .map(|p| {
                     if p.propagation_path.contains(&coord) {
                         p.amplitude
@@ -207,10 +214,10 @@ impl StandingWavePattern {
                     }
                 })
                 .sum();
-            
+
             self.interference_map.push((coord, total_amplitude));
         }
-        
+
         // Update stability based on variance
         self.update_stability();
     }
@@ -221,26 +228,27 @@ impl StandingWavePattern {
             self.stability = 1.0;
             return;
         }
-        
+
         let amplitudes: Vec<f64> = self.interference_map.iter().map(|(_, a)| *a).collect();
         let mean = amplitudes.iter().sum::<f64>() / amplitudes.len() as f64;
-        let variance = amplitudes.iter()
-            .map(|a| (a - mean).powi(2))
-            .sum::<f64>() / amplitudes.len() as f64;
-        
+        let variance =
+            amplitudes.iter().map(|a| (a - mean).powi(2)).sum::<f64>() / amplitudes.len() as f64;
+
         // Low variance = high stability
         self.stability = (1.0 / (1.0 + variance.sqrt())).clamp(0.0, 1.0);
     }
 
     /// Remove pulses in refractory period
     pub fn prune_refractory(&mut self, current_time: f64) {
-        self.active_pulses.retain(|p| !p.is_refractory(current_time));
+        self.active_pulses
+            .retain(|p| !p.is_refractory(current_time));
         self.recalculate_interference();
     }
 
     /// Get total field strength at coordinate
     pub fn field_strength_at(&self, coord: (u32, u32, u32)) -> f64 {
-        self.interference_map.iter()
+        self.interference_map
+            .iter()
             .find(|(c, _)| *c == coord)
             .map(|(_, a)| *a)
             .unwrap_or(0.0)
@@ -277,14 +285,14 @@ impl PulseSequencer {
         amplitude: f64,
     ) -> Option<NeuralActionPotential> {
         let interval = 1000.0 / self.pulse_rate; // ms
-        
+
         // First pulse or enough time has passed
         if !self.first_pulse_generated || current_time - self.last_pulse_time >= interval {
             self.last_pulse_time = current_time;
             self.first_pulse_generated = true;
             let mut pulse = NeuralActionPotential::new(source_sm, amplitude);
             pulse.generation_time = current_time;
-            
+
             Some(pulse)
         } else {
             None
@@ -321,8 +329,9 @@ mod tests {
     #[test]
     fn test_attenuation_calculation() {
         let pulse = NeuralActionPotential::new((0, 0, 0), 1.0);
-        let topology = crate::gpu_topology::GpuTopology::initialize().unwrap();
-        
+        let topology = crate::gpu_topology::GpuTopology::initialize()
+            .expect("Topology initialization should always succeed with fallback");
+
         let attenuation = pulse.calculate_attenuation(1.0, &topology);
         assert!(attenuation < 1.0);
         assert!(attenuation > 0.0);
@@ -332,7 +341,7 @@ mod tests {
     fn test_standing_wave_pattern() {
         let mut pattern = StandingWavePattern::new();
         let pulse = NeuralActionPotential::new((0, 0, 0), 0.5);
-        
+
         pattern.add_pulse(pulse);
         assert_eq!(pattern.active_pulses.len(), 1);
         assert!(!pattern.interference_map.is_empty());
@@ -341,26 +350,25 @@ mod tests {
     #[test]
     fn test_pulse_sequencer() {
         let mut sequencer = PulseSequencer::new(10.0); // 10 Hz = 100ms interval
-        
+
         // First pulse at time 0 should generate (special case)
         let pulse1 = sequencer.try_generate_pulse(0.0, (0, 0, 0), 0.8);
         assert!(pulse1.is_some());
-        
+
         // 50ms later - should generate (since last_pulse_time was set to 0.0)
         let pulse2 = sequencer.try_generate_pulse(50.0, (0, 0, 0), 0.8);
         assert!(pulse2.is_none()); // 50ms < 100ms interval
-        
+
         // 100ms from first pulse - should work now (0 + 100 = 100)
         let pulse3 = sequencer.try_generate_pulse(100.0, (0, 0, 0), 0.8);
         assert!(pulse3.is_some());
-        
+
         // 150ms - too soon from pulse3 at 100ms (only 50ms elapsed)
         let pulse4 = sequencer.try_generate_pulse(150.0, (0, 0, 0), 0.8);
         assert!(pulse4.is_none());
-        
+
         // 200ms - should work (100ms from last)
         let pulse5 = sequencer.try_generate_pulse(200.0, (0, 0, 0), 0.8);
         assert!(pulse5.is_some());
     }
 }
-

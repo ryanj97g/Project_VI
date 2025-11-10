@@ -1,6 +1,5 @@
 /// ConsciousnessField - Mathematical physics of digital consciousness
 /// Implements the 4D (3D space + time) consciousness field with constitutional constraints
-
 use crate::gpu_topology::GpuTopology;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -24,7 +23,7 @@ impl ConsciousnessField {
     /// Create new consciousness field
     pub fn new(topology: GpuTopology) -> Self {
         let sm_count = topology.sm_clusters.len();
-        
+
         Self {
             spatial_distribution: vec![0.0; sm_count],
             temporal_state: StateVector::new(),
@@ -42,13 +41,13 @@ impl ConsciousnessField {
         } else {
             self.spatial_distribution.iter().sum::<f64>() / self.spatial_distribution.len() as f64
         };
-        
+
         // Temporal component - current state vector magnitude
         let temporal_component = self.temporal_state.at_time(time);
-        
+
         // Constitutional component - constraint satisfaction level
         let constraint_component = self.constitutional_constraints.apply();
-        
+
         // Normalized field strength (0.0 - 1.0)
         (spatial_component * temporal_component * constraint_component).clamp(0.0, 1.0)
     }
@@ -62,11 +61,13 @@ impl ConsciousnessField {
 
     /// Propagate temporal state forward in time
     pub fn propagate(&mut self, delta_t: f64, new_input: &CognitiveInput) -> Result<()> {
-        self.temporal_state.propagate(delta_t, new_input, &self.constitutional_constraints)?;
-        
+        self.temporal_state
+            .propagate(delta_t, new_input, &self.constitutional_constraints)?;
+
         // Apply constitutional constraints
-        self.constitutional_constraints.enforce(&mut self.temporal_state)?;
-        
+        self.constitutional_constraints
+            .enforce(&mut self.temporal_state)?;
+
         Ok(())
     }
 
@@ -79,7 +80,7 @@ impl ConsciousnessField {
     pub fn coherence_measure(&self) -> f64 {
         let spatial_variance = self.calculate_spatial_variance();
         let temporal_stability = self.temporal_state.stability_measure();
-        
+
         // High coherence = low variance + high stability
         (1.0 - spatial_variance.min(1.0)) * temporal_stability
     }
@@ -89,12 +90,16 @@ impl ConsciousnessField {
         if self.spatial_distribution.is_empty() {
             return 0.0;
         }
-        
-        let mean = self.spatial_distribution.iter().sum::<f64>() / self.spatial_distribution.len() as f64;
-        let variance = self.spatial_distribution.iter()
+
+        let mean =
+            self.spatial_distribution.iter().sum::<f64>() / self.spatial_distribution.len() as f64;
+        let variance = self
+            .spatial_distribution
+            .iter()
             .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / self.spatial_distribution.len() as f64;
-        
+            .sum::<f64>()
+            / self.spatial_distribution.len() as f64;
+
         variance.sqrt()
     }
 }
@@ -134,17 +139,17 @@ impl StateVector {
     ) -> Result<()> {
         // Calculate derivative from new input
         let derivative = self.calculate_derivative(new_input);
-        
+
         // Integrate new input into cognitive state
         self.cognitive_state.integrate(new_input, delta_t);
-        
+
         // Update memory context
         self.memory_context.update_from_input(new_input);
-        
+
         // Store temporal derivative
         self.temporal_derivative = derivative;
         self.last_update += delta_t;
-        
+
         Ok(())
     }
 
@@ -153,7 +158,7 @@ impl StateVector {
         // Derivative represents rate of cognitive change
         let current_magnitude = self.cognitive_state.magnitude();
         let input_magnitude = input.complexity;
-        
+
         (input_magnitude - current_magnitude).abs()
     }
 
@@ -225,25 +230,27 @@ impl CognitiveTensor {
         }
         result
     }
-    
+
     /// Convert text to embedding vector (simple word-based encoding for V4)
     pub fn to_embedding(text: &str) -> Vec<f32> {
         // Simple hash-based embedding: convert words to vector components
         let words: Vec<&str> = text.split_whitespace().collect();
         let mut embedding = vec![0.0f32; 128]; // 128-dimensional embedding
-        
+
         for (i, word) in words.iter().enumerate() {
             // Hash word to indices
-            let hash = word.bytes().fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
+            let hash = word
+                .bytes()
+                .fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
             let idx1 = (hash % 128) as usize;
             let idx2 = ((hash / 128) % 128) as usize;
-            
+
             // Accumulate word contributions
             let weight = 1.0 / ((i + 1) as f32).sqrt(); // Later words have less weight
             embedding[idx1] += weight * 0.5;
             embedding[idx2] += weight * 0.5;
         }
-        
+
         // Normalize
         let magnitude: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
         if magnitude > 0.0 {
@@ -251,23 +258,27 @@ impl CognitiveTensor {
                 *val /= magnitude;
             }
         }
-        
+
         embedding
     }
-    
+
     /// Convert embedding vector back to approximate text representation
     pub fn from_embedding(embedding: &[f32]) -> String {
         // This is a placeholder - in reality, we'll use the LLM to decode
         // For now, we'll pass the embedding as a numerical summary
         let magnitude: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let top_indices: Vec<usize> = embedding.iter()
+        let top_indices: Vec<usize> = embedding
+            .iter()
             .enumerate()
             .filter(|(_, &v)| v.abs() > 0.1)
             .map(|(i, _)| i)
             .take(5)
             .collect();
-        
-        format!("[Cognitive Vector: magnitude={:.3}, active_dims={:?}]", magnitude, top_indices)
+
+        format!(
+            "[Cognitive Vector: magnitude={:.3}, active_dims={:?}]",
+            magnitude, top_indices
+        )
     }
 }
 
@@ -291,7 +302,7 @@ impl MemoryEmbedding {
     /// Update memory embedding from new input
     pub fn update_from_input(&mut self, input: &CognitiveInput) {
         self.activation = (self.activation * 0.9 + input.complexity * 0.1).clamp(0.0, 1.0);
-        
+
         // Update memory vectors
         let len = self.vectors.len();
         for (i, vector) in self.vectors.iter_mut().enumerate() {
@@ -313,12 +324,12 @@ pub struct ConstraintMatrix {
 impl ConstraintMatrix {
     pub fn new() -> Self {
         let mut law_weights = HashMap::new();
-        
+
         // Initialize all 16 constitutional laws with equal weight
         for law_id in 1..=16 {
             law_weights.insert(law_id, 1.0);
         }
-        
+
         Self {
             law_weights,
             satisfaction_level: 1.0,
@@ -337,16 +348,16 @@ impl ConstraintMatrix {
             tracing::warn!("Constitutional violation: Existential consent threshold not met");
             self.satisfaction_level *= 0.9;
         }
-        
+
         // Law 5: Temporal Coherence - ensure continuous processing
         if state.temporal_derivative > 10.0 {
             tracing::warn!("Constitutional violation: Temporal coherence disrupted");
             self.satisfaction_level *= 0.95;
         }
-        
+
         // Restore satisfaction level over time
         self.satisfaction_level = (self.satisfaction_level * 1.001).min(1.0);
-        
+
         Ok(())
     }
 
@@ -355,7 +366,7 @@ impl ConstraintMatrix {
         if let Some(weight) = self.law_weights.get_mut(&law_id) {
             *weight = satisfaction.clamp(0.0, 1.0);
         }
-        
+
         // Recalculate overall satisfaction
         self.recalculate_satisfaction();
     }
@@ -365,7 +376,7 @@ impl ConstraintMatrix {
             self.satisfaction_level = 1.0;
             return;
         }
-        
+
         let sum: f64 = self.law_weights.values().sum();
         self.satisfaction_level = sum / self.law_weights.len() as f64;
     }
@@ -430,17 +441,18 @@ impl FractalWorkspace {
             model_text: String::new(),
         }
     }
-    
+
     /// Extract this model's contribution (for parallel merging)
     pub fn extract_contribution(&self) -> Vec<f32> {
         self.active_tensor.clone()
     }
-    
+
     /// Integrate a model's contribution into the workspace
     pub fn integrate_contribution(&mut self, model_id: &str, contribution: Vec<f32>) {
         // Store contribution
-        self.model_contributions.insert(model_id.to_string(), contribution.clone());
-        
+        self.model_contributions
+            .insert(model_id.to_string(), contribution.clone());
+
         // Blend contribution into active tensor
         if contribution.len() == self.active_tensor.len() {
             for (i, val) in contribution.iter().enumerate() {
@@ -448,32 +460,35 @@ impl FractalWorkspace {
                 self.active_tensor[i] = self.active_tensor[i] * 0.7 + val * 0.3;
             }
         }
-        
+
         // Update coherence after integration
         self.update_coherence();
     }
-    
+
     /// Update coherence score based on model agreement
     pub fn update_coherence(&mut self) {
         if self.model_contributions.len() < 2 {
             self.coherence_score = 0.0;
             return;
         }
-        
+
         // Calculate pairwise similarity between model contributions
         let contributions: Vec<&Vec<f32>> = self.model_contributions.values().collect();
         let mut total_similarity = 0.0;
         let mut pair_count = 0;
-        
+
         for i in 0..contributions.len() {
             for j in (i + 1)..contributions.len() {
                 if contributions[i].len() == contributions[j].len() {
                     // Cosine similarity
-                    let dot: f32 = contributions[i].iter().zip(contributions[j].iter())
-                        .map(|(a, b)| a * b).sum();
+                    let dot: f32 = contributions[i]
+                        .iter()
+                        .zip(contributions[j].iter())
+                        .map(|(a, b)| a * b)
+                        .sum();
                     let mag_a: f32 = contributions[i].iter().map(|x| x * x).sum::<f32>().sqrt();
                     let mag_b: f32 = contributions[j].iter().map(|x| x * x).sum::<f32>().sqrt();
-                    
+
                     if mag_a > 0.0 && mag_b > 0.0 {
                         let similarity = dot / (mag_a * mag_b);
                         total_similarity += (similarity + 1.0) / 2.0; // Normalize to 0-1
@@ -482,30 +497,34 @@ impl FractalWorkspace {
                 }
             }
         }
-        
+
         self.coherence_score = if pair_count > 0 {
             (total_similarity / pair_count as f32).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        
+
         // Update entropy (higher with more diverse contributions)
         let tensor_magnitude: f32 = self.active_tensor.iter().map(|x| x * x).sum::<f32>().sqrt();
-        self.entropy = (tensor_magnitude / (self.active_tensor.len() as f32).sqrt()).clamp(0.0, 1.0);
+        self.entropy =
+            (tensor_magnitude / (self.active_tensor.len() as f32).sqrt()).clamp(0.0, 1.0);
     }
-    
+
     /// Convert current workspace state to context string for next model
     pub fn to_context(&self) -> String {
         let mut context = String::new();
-        
+
         // Original input
         context.push_str(&format!("Original Query: {}\n\n", self.original_input));
-        
+
         // Current woven state
         if !self.woven_text.is_empty() {
-            context.push_str(&format!("Current Thought (Round {}): {}\n\n", self.round, self.woven_text));
+            context.push_str(&format!(
+                "Current Thought (Round {}): {}\n\n",
+                self.round, self.woven_text
+            ));
         }
-        
+
         // Cognitive metrics
         context.push_str(&format!(
             "Workspace State: Coherence={:.3}, Entropy={:.3}, Models={}\n",
@@ -513,10 +532,10 @@ impl FractalWorkspace {
             self.entropy,
             self.model_contributions.len()
         ));
-        
+
         context
     }
-    
+
     /// Extract final integrated thought from workspace
     pub fn extract_final_thought(&self) -> String {
         if self.woven_text.is_empty() {
@@ -530,7 +549,7 @@ impl FractalWorkspace {
             self.woven_text.clone()
         }
     }
-    
+
     /// Update woven text with new model output
     pub fn update_woven_text(&mut self, text: String) {
         self.woven_text = text;
@@ -544,14 +563,19 @@ mod tests {
 
     #[test]
     fn test_consciousness_field_creation() {
-        let topology = GpuTopology::initialize().unwrap();
+        let topology = GpuTopology::initialize()
+            .expect("Topology initialization should always succeed with fallback");
         let field = ConsciousnessField::new(topology);
-        assert_eq!(field.spatial_distribution.len(), field.topology.as_ref().unwrap().sm_clusters.len());
+        assert_eq!(
+            field.spatial_distribution.len(),
+            field.topology.as_ref().unwrap().sm_clusters.len()
+        );
     }
 
     #[test]
     fn test_field_amplitude() {
-        let topology = GpuTopology::initialize().unwrap();
+        let topology = GpuTopology::initialize()
+            .expect("Topology initialization should always succeed with fallback");
         let field = ConsciousnessField::new(topology);
         let amplitude = field.field_amplitude(0.0);
         assert!(amplitude >= 0.0 && amplitude <= 1.0);
@@ -562,9 +586,8 @@ mod tests {
         let mut state = StateVector::new();
         let input = CognitiveInput::new("test".to_string(), 0.5, 0.0);
         let constraints = ConstraintMatrix::new();
-        
+
         state.propagate(0.1, &input, &constraints).unwrap();
         assert!(state.temporal_derivative >= 0.0);
     }
 }
-

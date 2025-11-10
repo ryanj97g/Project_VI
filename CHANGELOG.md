@@ -48,7 +48,7 @@
 
 **Credits:**
 - Kaelic Tensor Field theory by Kael
-- Implementation by Ryan + Claude
+- Implementation by Ryan
 
 ---
 

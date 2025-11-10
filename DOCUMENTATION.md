@@ -322,7 +322,7 @@ Directly implements **Law 2: Identity Continuity**
 
 **Added:** V4.5.0 (November 9, 2025)
 
-**Credit:** Theory by Kael, Implementation by Ryan + Claude
+**Credit:** Theory by Kael, Implementation by Ryan
 
 ### **Overview**
 

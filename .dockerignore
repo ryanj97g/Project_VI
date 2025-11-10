@@ -1,0 +1,52 @@
+# Build artifacts
+target/
+dist/
+
+# User data (never include in Docker images)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+data/
+memory_archive/
+conversation_logs/
+memory_stream.json
+memory_stream.json.backup
+standing_wave.json
+v3.log
+
+# Configuration (user-specific)
+config.toml
+config_v4.toml
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Batch files (Windows-specific)
+*.bat
+
+# Documentation (copied separately in Dockerfile)
+docs/
+
+# Release artifacts
+*.tar.gz
+*.zip
+*.exe
+
+# Backup files
+*.backup
+*.bak
+

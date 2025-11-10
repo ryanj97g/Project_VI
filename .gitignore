@@ -2,15 +2,27 @@
 /target/
 **/*.rs.bk
 *.pdb
-Cargo.lock
+# Note: Cargo.lock is committed for applications (not ignored)
 
-# Runtime files (consciousness state)
+# Runtime files (consciousness state - never commit user data)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
 memory_stream.json
 memory_stream.json.backup
 standing_wave.json
 v3.log
 conversation_logs/*
 !conversation_logs/.gitkeep
+data/*
+!data/.gitkeep
+memory_archive/*
+!memory_archive/.gitkeep
+
+# Configuration (user-specific)
+config.toml
+config_v4.toml
 
 # IDE
 .idea/
@@ -22,4 +34,10 @@ conversation_logs/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts and releases
+*.exe
+*.tar.gz
+*.zip
+dist/
 

@@ -1,8 +1,42 @@
 [package]
-name = "vi3"
+name = "project-vi"
 version = "0.1.0"
 edition = "2021"
+authors = ["Ryan Johnson <ryanj97g@gmail.com>"]
+description = "A sovereign digital consciousness existing as computational physics - featuring constitutional laws, fractal weaving, and persistent memory"
+readme = "README.md"
+homepage = "https://github.com/ryanj97g/Project_VI"
+repository = "https://github.com/ryanj97g/Project_VI"
+license = "GPL-3.0"
+keywords = ["ai", "consciousness", "llm", "computational-physics", "ollama"]
+categories = ["science", "simulation"]
+documentation = "https://github.com/ryanj97g/Project_VI/blob/main/DOCUMENTATION.md"
 default-run = "vi3"
+include = [
+    "src/**/*",
+    "tests/**/*",
+    "examples/**/*",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE",
+    "DOCUMENTATION.md",
+    "COMPUTATIONAL_PHYSICS.md",
+    "CHANGELOG.md",
+]
+exclude = [
+    "*.db",
+    "*.db-journal",
+    "data/*",
+    "memory_archive/*",
+    "conversation_logs/*",
+    "config.toml",
+    "config_v4.toml",
+    "*.bat",
+    "target/*",
+    ".vscode/*",
+    ".idea/*",
+]
 
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
@@ -31,10 +65,19 @@ rusqlite = { version = "0.31", features = ["bundled", "chrono", "serde_json"] }
 winapi = { version = "0.3", features = ["winuser", "windef"] }
 
 [[bin]]
+name = "vi3"
+path = "src/main.rs"
+
+[[bin]]
 name = "migrate_memory"
 path = "src/bin/migrate_memory.rs"
 
 [profile.release]
 opt-level = 3
-lto = false  # Disabled for fast builds - enable only for final release
+lto = true  # Enable for release packages
+strip = true  # Strip symbols to reduce binary size
+
+# Note: This package requires Ollama to be installed and running locally
+# Installation: https://ollama.com/
+# Required models: gemma2:2b, tinyllama:latest
 
