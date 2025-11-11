@@ -38,6 +38,14 @@ pub struct Config {
     #[serde(default)]
     pub enable_autonomous_research: bool,
 
+    // Model Configuration (Ollama model names)
+    #[serde(default = "default_main_model")]
+    pub main_model: String,
+    #[serde(default = "default_curiosity_model")]
+    pub curiosity_model: String,
+    #[serde(default = "default_valence_model")]
+    pub valence_model: String,
+
     // Conversation Logging
     #[serde(default = "default_logging_enabled")]
     pub enable_conversation_logging: bool,
@@ -76,6 +84,15 @@ fn default_coherence_threshold() -> f32 {
 fn default_search_interval() -> u32 {
     25
 }
+fn default_main_model() -> String {
+    "gemma2:2b".to_string()
+}
+fn default_curiosity_model() -> String {
+    "tinyllama:latest".to_string()
+}
+fn default_valence_model() -> String {
+    "gemma2:2b".to_string()
+}
 fn default_logging_enabled() -> bool {
     true
 }
@@ -99,6 +116,9 @@ impl Default for Config {
             enable_curiosity_search: false,
             curiosity_search_interval: default_search_interval(),
             enable_autonomous_research: false, // Sovereign research module (new)
+            main_model: default_main_model(),
+            curiosity_model: default_curiosity_model(),
+            valence_model: default_valence_model(),
             enable_conversation_logging: default_logging_enabled(),
             conversation_logs_folder: default_logs_folder(),
         }

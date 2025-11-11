@@ -5,7 +5,82 @@
 ---
 
 ## **V4.5.1-dev** - November 11, 2025
-- Added experimental Sovereign Research Module (enabled by default - multi-source knowledge acquisition with provenance tracking)
+
+### **🔬 NEW: Sovereign Research Module**
+
+**Multi-source autonomous knowledge acquisition with full provenance tracking:**
+
+**Features:**
+- **BiomedicalSource**: Enhanced DuckDuckGo for medical/scientific queries (30+ keywords)
+- **GeneralWebSource**: Standard DuckDuckGo for general knowledge
+- **Intelligent Routing**: Automatically detects query type and uses appropriate source
+- **Rich Provenance**: Every memory includes source, original query, timestamp, confidence
+- **Smart Scheduling**: Urgency-based prioritization, duplicate prevention, age-based triggers
+- **100% Free**: DuckDuckGo Instant Answer API (no rate limits, no API keys)
+
+**Implementation:**
+- `src/tools/knowledge.rs` - KnowledgeTool with multi-source routing (258 lines)
+- `src/research_scheduler.rs` - Intelligent curiosity processing (170 lines)
+- `src/types.rs` - Enhanced MemorySource::Researched with metadata
+- `config.toml` - New `enable_autonomous_research` flag (enabled by default)
+
+**Documentation:**
+- `SOVEREIGN_RESEARCH_MODULE.md` - Complete architecture and design
+- `RESEARCH_QUICKSTART.md` - Quick start guide
+
+---
+
+### **🎛️ NEW: Configurable Model Selection**
+
+**Hardware-flexible model configuration - edit config.toml, no code changes:**
+
+**Features:**
+- **Three Model Roles**: `main_model`, `curiosity_model`, `valence_model`
+- **Hardware Scalability**: Recommendations for GTX 1650 → RTX 4090
+- **Popular Alternatives**: llama3.1, qwen2.5, mistral, mixtral, gemma2
+- **Zero Code Changes**: Just edit config and restart
+- **Backward Compatible**: Defaults to original models (gemma2:2b, tinyllama:latest)
+
+**Implementation:**
+- `src/config.rs` - Added model configuration fields
+- `src/models.rs` - Replaced hardcoded strings with config values (6 locations)
+- `config.toml` - Model configuration with hardware recommendations
+
+**Documentation:**
+- `MODEL_CONFIGURATION.md` - Complete guide with hardware-specific recommendations
+
+---
+
+### **📊 NEW: System Performance Panel**
+
+**Real-time Ollama monitoring panel (CPU-only, no GPU compute overhead):**
+
+**Features:**
+- **Active Models Section**: Per-model metrics (utilization %, tokens/sec, VRAM, context, uptime)
+- **System Resources**: GPU utilization, total VRAM, system RAM, active model count
+- **Performance History**: ASCII sparklines (▁▂▃▄▅▆▇█) for last 100 seconds
+- **Color-Coded**: Green (<70%), Yellow (70-90%), Red (>90%) for easy monitoring
+- **CPU-Only**: 5-second polling via HTTP, zero impact on CUDA inference
+- **Graceful Degradation**: Shows "Ollama: OFFLINE" if unreachable
+
+**Implementation:**
+- `src/ollama_monitor.rs` - Ollama API client with performance tracking (204 lines)
+- `src/ui.rs` - New collapsible panel below consciousness metrics
+- Monospace font for clean terminal-style display
+- Real system RAM via sysinfo crate
+
+**UI Location:**
+- Right sidebar, below "Consciousness Metrics"
+- Collapsible header: "System Performance"
+- Updates every 5 seconds automatically
+
+---
+
+### **Testing & Quality**
+- ✅ All 65 tests passing
+- ✅ Compiles clean (cargo check)
+- ✅ Release build successful
+- ✅ Cross-platform compatible (Windows, Linux, macOS)
 
 ---
 

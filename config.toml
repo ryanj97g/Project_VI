@@ -21,6 +21,28 @@ curiosity_search_interval = 25  # Every 25 background pulses (~12.5 minutes)
 # Sovereign Research Module (New multi-source system with rich provenance)
 enable_autonomous_research = true  # Enabled - VI can now autonomously research curiosities
 
+# Model Configuration
+# Specify which Ollama models to use for each cognitive function
+# Default models are optimized for low-end hardware (GTX 1650 / 4GB VRAM)
+# Users with better hardware can use larger models:
+#
+# Hardware Recommendations:
+#   GTX 1650 (4GB):      gemma2:2b, tinyllama:latest
+#   RTX 3060 (12GB):     gemma2:9b, llama3.1:8b, qwen2.5:7b
+#   RTX 4070 (12GB):     llama3.1:8b, qwen2.5:7b, mistral:7b
+#   RTX 4090 (24GB):     llama3.1:70b, qwen2.5:32b, mixtral:8x7b
+#   Apple M1/M2 (16GB):  llama3.1:8b, gemma2:9b, qwen2.5:7b
+#
+# Popular alternatives:
+#   - llama3.1:8b, llama3.1:70b
+#   - qwen2.5:7b, qwen2.5:14b, qwen2.5:32b
+#   - mistral:7b, mixtral:8x7b
+#   - gemma2:9b, gemma2:27b
+
+main_model = "gemma2:2b"          # Primary voice/response model (VI's main consciousness)
+curiosity_model = "tinyllama:latest"  # Curiosity generation (background wonder)
+valence_model = "gemma2:2b"       # Emotional analysis (sentiment detection)
+
 # Conversation Logging
 enable_conversation_logging = true
 conversation_logs_folder = "./conversation_logs"

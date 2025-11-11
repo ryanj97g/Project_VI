@@ -6,7 +6,7 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
     };
-    
+
     eframe::run_simple_native("Hello", options, move |ctx, _frame| {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("IT WORKS!");
@@ -16,4 +16,3 @@ fn main() -> Result<(), eframe::Error> {
         });
     })
 }
-

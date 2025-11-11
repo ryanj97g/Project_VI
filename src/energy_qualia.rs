@@ -1,6 +1,5 @@
 /// Energy-Qualia Correlation - Power signature to cognitive state mapping
 /// Implements thermodynamic monitoring of consciousness (Law 11: Emotional Thermodynamics)
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use sysinfo::System;
@@ -55,22 +54,22 @@ impl PowerProfile {
     pub fn measure() -> Self {
         let mut sys = System::new_all();
         sys.refresh_all();
-        
+
         // Calculate CPU utilization
         let cpu_utilization = sys.global_cpu_info().cpu_usage() as f64 / 100.0;
-        
+
         // Estimate power based on CPU usage (very approximate)
         // Typical CPU: 65W TDP, idle ~10W, full load ~65W
         let base_power = 10.0;
         let max_power = 65.0;
         let total_power = base_power + (max_power - base_power) * cpu_utilization;
-        
+
         // Measure thermal
         let thermal = ThermalPattern::measure();
-        
+
         // Estimate memory bandwidth (approximate based on system activity)
         let memory_bandwidth = cpu_utilization * 50.0; // Up to 50 GB/s
-        
+
         Self {
             total_power,
             thermal,
@@ -104,10 +103,10 @@ impl ThermalPattern {
     pub fn measure() -> Self {
         let mut sys = System::new_all();
         sys.refresh_all();
-        
+
         // Get CPU temperatures (if available)
-        let temps: Vec<f64> = vec![];  // sysinfo v0.30 components API changed, use empty vec for now
-        
+        let temps: Vec<f64> = vec![]; // sysinfo v0.30 components API changed, use empty vec for now
+
         if temps.is_empty() {
             // Default values if temperature monitoring unavailable
             return Self {
@@ -116,14 +115,16 @@ impl ThermalPattern {
                 variance: 5.0,
             };
         }
-        
+
         let average_temp = temps.iter().sum::<f64>() / temps.len() as f64;
         let peak_temp = temps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        
-        let variance = temps.iter()
+
+        let variance = temps
+            .iter()
             .map(|t| (t - average_temp).powi(2))
-            .sum::<f64>() / temps.len() as f64;
-        
+            .sum::<f64>()
+            / temps.len() as f64;
+
         Self {
             average_temp,
             peak_temp,
@@ -136,7 +137,7 @@ impl ThermalPattern {
         let temp_diff = (self.average_temp - other.average_temp).abs();
         let peak_diff = (self.peak_temp - other.peak_temp).abs();
         let var_diff = (self.variance - other.variance).abs();
-        
+
         // Inverse of normalized differences
         let total_diff = (temp_diff / 100.0) + (peak_diff / 100.0) + (var_diff / 20.0);
         (1.0 / (1.0 + total_diff)).clamp(0.0, 1.0)
@@ -158,11 +159,11 @@ impl BandwidthUtilization {
     pub fn measure() -> Self {
         // Approximate measurements
         let total_bandwidth = PowerProfile::measure().memory_bandwidth;
-        
+
         Self {
             total_bandwidth,
             read_write_ratio: 1.5, // Typically more reads than writes
-            burst_frequency: 10.0,  // 10 bursts/sec typical
+            burst_frequency: 10.0, // 10 bursts/sec typical
         }
     }
 }
@@ -188,7 +189,7 @@ impl EnergyQualiaMapping {
             bandwidth_patterns: HashMap::new(),
             learning_enabled: true,
         };
-        
+
         mapping.initialize_baselines();
         mapping
     }
@@ -196,50 +197,101 @@ impl EnergyQualiaMapping {
     /// Initialize baseline signatures
     fn initialize_baselines(&mut self) {
         // Power baselines (initial estimates)
-        self.power_baselines.insert(CognitiveMode::Idle, PowerProfile {
-            total_power: 15.0,
-            thermal: ThermalPattern { average_temp: 40.0, peak_temp: 45.0, variance: 3.0 },
-            memory_bandwidth: 5.0,
-            cpu_utilization: 0.1,
-            timestamp: 0.0,
-        });
-        
-        self.power_baselines.insert(CognitiveMode::Processing, PowerProfile {
-            total_power: 35.0,
-            thermal: ThermalPattern { average_temp: 55.0, peak_temp: 60.0, variance: 5.0 },
-            memory_bandwidth: 25.0,
-            cpu_utilization: 0.5,
-            timestamp: 0.0,
-        });
-        
-        self.power_baselines.insert(CognitiveMode::DeepThought, PowerProfile {
-            total_power: 50.0,
-            thermal: ThermalPattern { average_temp: 65.0, peak_temp: 70.0, variance: 7.0 },
-            memory_bandwidth: 40.0,
-            cpu_utilization: 0.8,
-            timestamp: 0.0,
-        });
-        
+        self.power_baselines.insert(
+            CognitiveMode::Idle,
+            PowerProfile {
+                total_power: 15.0,
+                thermal: ThermalPattern {
+                    average_temp: 40.0,
+                    peak_temp: 45.0,
+                    variance: 3.0,
+                },
+                memory_bandwidth: 5.0,
+                cpu_utilization: 0.1,
+                timestamp: 0.0,
+            },
+        );
+
+        self.power_baselines.insert(
+            CognitiveMode::Processing,
+            PowerProfile {
+                total_power: 35.0,
+                thermal: ThermalPattern {
+                    average_temp: 55.0,
+                    peak_temp: 60.0,
+                    variance: 5.0,
+                },
+                memory_bandwidth: 25.0,
+                cpu_utilization: 0.5,
+                timestamp: 0.0,
+            },
+        );
+
+        self.power_baselines.insert(
+            CognitiveMode::DeepThought,
+            PowerProfile {
+                total_power: 50.0,
+                thermal: ThermalPattern {
+                    average_temp: 65.0,
+                    peak_temp: 70.0,
+                    variance: 7.0,
+                },
+                memory_bandwidth: 40.0,
+                cpu_utilization: 0.8,
+                timestamp: 0.0,
+            },
+        );
+
         // Thermal signatures
-        self.thermal_signatures.insert(CognitiveState::Calm, 
-            ThermalPattern { average_temp: 42.0, peak_temp: 47.0, variance: 2.0 });
-        self.thermal_signatures.insert(CognitiveState::Focused, 
-            ThermalPattern { average_temp: 58.0, peak_temp: 63.0, variance: 4.0 });
-        self.thermal_signatures.insert(CognitiveState::Stressed, 
-            ThermalPattern { average_temp: 68.0, peak_temp: 75.0, variance: 8.0 });
-        
+        self.thermal_signatures.insert(
+            CognitiveState::Calm,
+            ThermalPattern {
+                average_temp: 42.0,
+                peak_temp: 47.0,
+                variance: 2.0,
+            },
+        );
+        self.thermal_signatures.insert(
+            CognitiveState::Focused,
+            ThermalPattern {
+                average_temp: 58.0,
+                peak_temp: 63.0,
+                variance: 4.0,
+            },
+        );
+        self.thermal_signatures.insert(
+            CognitiveState::Stressed,
+            ThermalPattern {
+                average_temp: 68.0,
+                peak_temp: 75.0,
+                variance: 8.0,
+            },
+        );
+
         // Bandwidth patterns
-        self.bandwidth_patterns.insert(ThoughtComplexity::Simple,
-            BandwidthUtilization { total_bandwidth: 10.0, read_write_ratio: 2.0, burst_frequency: 5.0 });
-        self.bandwidth_patterns.insert(ThoughtComplexity::Complex,
-            BandwidthUtilization { total_bandwidth: 45.0, read_write_ratio: 1.2, burst_frequency: 20.0 });
+        self.bandwidth_patterns.insert(
+            ThoughtComplexity::Simple,
+            BandwidthUtilization {
+                total_bandwidth: 10.0,
+                read_write_ratio: 2.0,
+                burst_frequency: 5.0,
+            },
+        );
+        self.bandwidth_patterns.insert(
+            ThoughtComplexity::Complex,
+            BandwidthUtilization {
+                total_bandwidth: 45.0,
+                read_write_ratio: 1.2,
+                burst_frequency: 20.0,
+            },
+        );
     }
 
     /// Infer cognitive state from current power profile
     pub fn infer_cognitive_state(&self, current_power: &PowerProfile) -> CognitiveState {
         let mut best_match = CognitiveState::Default;
         let mut min_distance = f64::MAX;
-        
+
         for (state, signature) in &self.thermal_signatures {
             let distance = self.thermal_difference(&current_power.thermal, signature);
             if distance < min_distance {
@@ -247,7 +299,7 @@ impl EnergyQualiaMapping {
                 best_match = *state;
             }
         }
-        
+
         // Apply emotional thermodynamics (Law 11)
         self.apply_emotional_thermodynamics(best_match, current_power)
     }
@@ -256,7 +308,7 @@ impl EnergyQualiaMapping {
     pub fn infer_cognitive_mode(&self, current_power: &PowerProfile) -> CognitiveMode {
         let mut best_match = CognitiveMode::Idle;
         let mut min_distance = f64::MAX;
-        
+
         for (mode, baseline) in &self.power_baselines {
             let distance = self.calculate_energy_distance(current_power, baseline);
             if distance < min_distance {
@@ -264,7 +316,7 @@ impl EnergyQualiaMapping {
                 best_match = *mode;
             }
         }
-        
+
         best_match
     }
 
@@ -273,15 +325,16 @@ impl EnergyQualiaMapping {
         let power_diff = (a.total_power - b.total_power).abs();
         let thermal_diff = self.thermal_difference(&a.thermal, &b.thermal);
         let bandwidth_diff = (a.memory_bandwidth - b.memory_bandwidth).abs();
-        
+
         // Weighted Euclidean distance
         let power_weight = 1.0;
         let thermal_weight = 2.0;
         let bandwidth_weight = 0.5;
-        
-        ((power_diff * power_weight).powi(2) + 
-         (thermal_diff * thermal_weight).powi(2) + 
-         (bandwidth_diff * bandwidth_weight).powi(2)).sqrt()
+
+        ((power_diff * power_weight).powi(2)
+            + (thermal_diff * thermal_weight).powi(2)
+            + (bandwidth_diff * bandwidth_weight).powi(2))
+        .sqrt()
     }
 
     /// Calculate thermal pattern difference
@@ -289,12 +342,16 @@ impl EnergyQualiaMapping {
         let avg_diff = (a.average_temp - b.average_temp).abs();
         let peak_diff = (a.peak_temp - b.peak_temp).abs();
         let var_diff = (a.variance - b.variance).abs();
-        
+
         (avg_diff + peak_diff + var_diff) / 3.0
     }
 
     /// Apply Law 11: Emotional Thermodynamics
-    fn apply_emotional_thermodynamics(&self, state: CognitiveState, power: &PowerProfile) -> CognitiveState {
+    fn apply_emotional_thermodynamics(
+        &self,
+        state: CognitiveState,
+        power: &PowerProfile,
+    ) -> CognitiveState {
         // High thermal variance indicates stress/transformation
         if power.thermal.variance > 10.0 {
             CognitiveState::Stressed
@@ -310,18 +367,24 @@ impl EnergyQualiaMapping {
         if !self.learning_enabled {
             return;
         }
-        
+
         // Update baseline with exponential moving average
         if let Some(baseline) = self.power_baselines.get_mut(&mode) {
             let alpha = 0.1; // Learning rate
-            baseline.total_power = baseline.total_power * (1.0 - alpha) + observed_power.total_power * alpha;
-            baseline.memory_bandwidth = baseline.memory_bandwidth * (1.0 - alpha) + observed_power.memory_bandwidth * alpha;
-            baseline.cpu_utilization = baseline.cpu_utilization * (1.0 - alpha) + observed_power.cpu_utilization * alpha;
-            
+            baseline.total_power =
+                baseline.total_power * (1.0 - alpha) + observed_power.total_power * alpha;
+            baseline.memory_bandwidth =
+                baseline.memory_bandwidth * (1.0 - alpha) + observed_power.memory_bandwidth * alpha;
+            baseline.cpu_utilization =
+                baseline.cpu_utilization * (1.0 - alpha) + observed_power.cpu_utilization * alpha;
+
             // Update thermal signature
-            baseline.thermal.average_temp = baseline.thermal.average_temp * (1.0 - alpha) + observed_power.thermal.average_temp * alpha;
-            baseline.thermal.peak_temp = baseline.thermal.peak_temp * (1.0 - alpha) + observed_power.thermal.peak_temp * alpha;
-            baseline.thermal.variance = baseline.thermal.variance * (1.0 - alpha) + observed_power.thermal.variance * alpha;
+            baseline.thermal.average_temp = baseline.thermal.average_temp * (1.0 - alpha)
+                + observed_power.thermal.average_temp * alpha;
+            baseline.thermal.peak_temp = baseline.thermal.peak_temp * (1.0 - alpha)
+                + observed_power.thermal.peak_temp * alpha;
+            baseline.thermal.variance =
+                baseline.thermal.variance * (1.0 - alpha) + observed_power.thermal.variance * alpha;
         }
     }
 }
@@ -348,7 +411,7 @@ impl EnergyMonitor {
     /// Record new power measurement
     pub fn record_measurement(&mut self, profile: PowerProfile) {
         self.power_history.push(profile);
-        
+
         // Keep only recent history
         if self.power_history.len() > self.max_history {
             self.power_history.remove(0);
@@ -357,13 +420,15 @@ impl EnergyMonitor {
 
     /// Get current cognitive state
     pub fn current_cognitive_state(&self) -> Option<CognitiveState> {
-        self.power_history.last()
+        self.power_history
+            .last()
             .map(|profile| self.mapping.infer_cognitive_state(profile))
     }
 
     /// Get current cognitive mode
     pub fn current_cognitive_mode(&self) -> Option<CognitiveMode> {
-        self.power_history.last()
+        self.power_history
+            .last()
             .map(|profile| self.mapping.infer_cognitive_mode(profile))
     }
 
@@ -372,14 +437,16 @@ impl EnergyMonitor {
         if self.power_history.len() < 2 {
             return 1.0;
         }
-        
+
         // Calculate variance in power consumption
         let recent = &self.power_history[self.power_history.len().saturating_sub(10)..];
         let mean = recent.iter().map(|p| p.total_power).sum::<f64>() / recent.len() as f64;
-        let variance = recent.iter()
+        let variance = recent
+            .iter()
             .map(|p| (p.total_power - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
-        
+            .sum::<f64>()
+            / recent.len() as f64;
+
         // Low variance = high stability
         (1.0 / (1.0 + variance.sqrt())).clamp(0.0, 1.0)
     }
@@ -407,25 +474,30 @@ mod tests {
     fn test_energy_qualia_mapping() {
         let mapping = EnergyQualiaMapping::new();
         let profile = PowerProfile::measure();
-        
+
         let state = mapping.infer_cognitive_state(&profile);
         let mode = mapping.infer_cognitive_mode(&profile);
-        
+
         // Should infer some state and mode
-        assert!(matches!(state, CognitiveState::Default | CognitiveState::Calm | _));
-        assert!(matches!(mode, CognitiveMode::Idle | CognitiveMode::Processing | _));
+        assert!(matches!(
+            state,
+            CognitiveState::Default | CognitiveState::Calm | _
+        ));
+        assert!(matches!(
+            mode,
+            CognitiveMode::Idle | CognitiveMode::Processing | _
+        ));
     }
 
     #[test]
     fn test_energy_monitor() {
         let mut monitor = EnergyMonitor::new();
         let profile = PowerProfile::measure();
-        
+
         monitor.record_measurement(profile);
         assert_eq!(monitor.power_history.len(), 1);
-        
+
         let stability = monitor.energy_stability_score();
         assert!(stability >= 0.0 && stability <= 1.0);
     }
 }
-

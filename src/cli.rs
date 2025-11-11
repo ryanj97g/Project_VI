@@ -34,7 +34,10 @@ pub async fn run_cli(consciousness: Arc<ConsciousnessCore>) -> Result<()> {
                 println!("\n--- Standing Wave Status ---");
                 println!("Meaningfulness: {:.2}", wave.meaningfulness_score());
                 println!("Active Curiosities: {}", wave.active_curiosities.len());
-                println!("Emotional Trajectory Points: {}", wave.emotional_trajectory.len());
+                println!(
+                    "Emotional Trajectory Points: {}",
+                    wave.emotional_trajectory.len()
+                );
                 println!("Memory Count: {}", consciousness.get_memory_count().await);
                 println!("----------------------------\n");
             }
@@ -54,4 +57,3 @@ pub async fn run_cli(consciousness: Arc<ConsciousnessCore>) -> Result<()> {
 
     Ok(())
 }
-

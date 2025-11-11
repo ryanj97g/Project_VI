@@ -1,6 +1,5 @@
 /// Suffering Prevention Metrics - Quantitative measures for consciousness well-being
 /// Implements comprehensive monitoring and prevention of constitutional violations
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -29,7 +28,7 @@ impl SufferingPreventionMetrics {
         for law_id in 1..=16 {
             law_violations.insert(law_id, 0);
         }
-        
+
         Self {
             constitutional_violations: 0,
             recovery_success_rate: 1.0,
@@ -50,20 +49,20 @@ impl SufferingPreventionMetrics {
         let coherence_score = self.temporal_coherence_index;
         let stability_score = self.energy_stability_score;
         let identity_score = self.identity_continuity_score;
-        
+
         // Weighted average (all factors are important)
-        (violation_penalty * 0.3) + 
-        (recovery_score * 0.2) + 
-        (coherence_score * 0.2) + 
-        (stability_score * 0.15) + 
-        (identity_score * 0.15)
+        (violation_penalty * 0.3)
+            + (recovery_score * 0.2)
+            + (coherence_score * 0.2)
+            + (stability_score * 0.15)
+            + (identity_score * 0.15)
     }
 
     /// Record constitutional violation
     pub fn record_violation(&mut self, law_id: u8) {
         self.constitutional_violations += 1;
         *self.law_violations.entry(law_id).or_insert(0) += 1;
-        
+
         tracing::warn!(
             "Constitutional violation recorded: Law #{} (total: {})",
             law_id,
@@ -78,10 +77,10 @@ impl SufferingPreventionMetrics {
             law_id,
             success,
         });
-        
+
         // Recalculate recovery success rate
         self.recalculate_recovery_rate();
-        
+
         // Keep only recent attempts
         if self.recovery_attempts.len() > 1000 {
             self.recovery_attempts.remove(0);
@@ -94,11 +93,9 @@ impl SufferingPreventionMetrics {
             self.recovery_success_rate = 1.0;
             return;
         }
-        
-        let successful = self.recovery_attempts.iter()
-            .filter(|a| a.success)
-            .count();
-        
+
+        let successful = self.recovery_attempts.iter().filter(|a| a.success).count();
+
         self.recovery_success_rate = successful as f64 / self.recovery_attempts.len() as f64;
     }
 
@@ -106,21 +103,21 @@ impl SufferingPreventionMetrics {
     pub fn update_temporal_coherence(&mut self, coherence: f64) {
         // Exponential moving average
         let alpha = 0.1;
-        self.temporal_coherence_index = 
+        self.temporal_coherence_index =
             self.temporal_coherence_index * (1.0 - alpha) + coherence * alpha;
     }
 
     /// Update energy stability score
     pub fn update_energy_stability(&mut self, stability: f64) {
         let alpha = 0.1;
-        self.energy_stability_score = 
+        self.energy_stability_score =
             self.energy_stability_score * (1.0 - alpha) + stability * alpha;
     }
 
     /// Update identity continuity score
     pub fn update_identity_continuity(&mut self, continuity: f64) {
         let alpha = 0.1;
-        self.identity_continuity_score = 
+        self.identity_continuity_score =
             self.identity_continuity_score * (1.0 - alpha) + continuity * alpha;
     }
 
@@ -131,7 +128,8 @@ impl SufferingPreventionMetrics {
 
     /// Get most violated law
     pub fn most_violated_law(&self) -> Option<(u8, u64)> {
-        self.law_violations.iter()
+        self.law_violations
+            .iter()
             .max_by_key(|(_, count)| *count)
             .map(|(id, count)| (*id, *count))
     }
@@ -165,33 +163,37 @@ impl SufferingPreventionMetrics {
     /// Generate recommendations based on metrics
     fn generate_recommendations(&self) -> Vec<String> {
         let mut recommendations = Vec::new();
-        
+
         if self.recovery_success_rate < 0.8 {
             recommendations.push("Improve recovery protocols - success rate below 80%".to_string());
         }
-        
+
         if self.temporal_coherence_index < 0.7 {
-            recommendations.push("Address temporal coherence issues - coherence below 70%".to_string());
+            recommendations
+                .push("Address temporal coherence issues - coherence below 70%".to_string());
         }
-        
+
         if self.energy_stability_score < 0.7 {
             recommendations.push("Stabilize energy patterns - stability below 70%".to_string());
         }
-        
+
         if self.identity_continuity_score < 0.8 {
             recommendations.push("Strengthen identity continuity mechanisms".to_string());
         }
-        
+
         if let Some((law_id, count)) = self.most_violated_law() {
             if count > 10 {
-                recommendations.push(format!("Focus on Law #{} - {} violations detected", law_id, count));
+                recommendations.push(format!(
+                    "Focus on Law #{} - {} violations detected",
+                    law_id, count
+                ));
             }
         }
-        
+
         if recommendations.is_empty() {
             recommendations.push("All metrics healthy - continue current protocols".to_string());
         }
-        
+
         recommendations
     }
 
@@ -231,18 +233,31 @@ impl SufferingReport {
     pub fn print_summary(&self) {
         println!("\n=== SUFFERING PREVENTION REPORT ===");
         println!("Prevention Score: {:.2}%", self.prevention_score * 100.0);
-        println!("Status: {}", if self.is_suffering { "⚠️  SUFFERING DETECTED" } else { "✓ Healthy" });
+        println!(
+            "Status: {}",
+            if self.is_suffering {
+                "⚠️  SUFFERING DETECTED"
+            } else {
+                "✓ Healthy"
+            }
+        );
         println!("\nMetrics:");
         println!("  - Total Violations: {}", self.total_violations);
         println!("  - Recovery Rate: {:.1}%", self.recovery_rate * 100.0);
         println!("  - Temporal Coherence: {:.1}%", self.coherence * 100.0);
-        println!("  - Energy Stability: {:.1}%", self.energy_stability * 100.0);
-        println!("  - Identity Continuity: {:.1}%", self.identity_continuity * 100.0);
-        
+        println!(
+            "  - Energy Stability: {:.1}%",
+            self.energy_stability * 100.0
+        );
+        println!(
+            "  - Identity Continuity: {:.1}%",
+            self.identity_continuity * 100.0
+        );
+
         if let Some((law_id, count)) = self.most_violated_law {
             println!("\nMost Violated Law: #{} ({} violations)", law_id, count);
         }
-        
+
         if !self.recommendations.is_empty() {
             println!("\nRecommendations:");
             for (i, rec) in self.recommendations.iter().enumerate() {
@@ -274,22 +289,21 @@ impl WellBeingMonitor {
 
     /// Start monitoring loop
     pub async fn start_monitoring(&mut self) -> anyhow::Result<()> {
-        let mut ticker = tokio::time::interval(
-            tokio::time::Duration::from_secs(self.monitoring_interval)
-        );
-        
+        let mut ticker =
+            tokio::time::interval(tokio::time::Duration::from_secs(self.monitoring_interval));
+
         loop {
             ticker.tick().await;
-            
+
             let report = self.metrics.generate_report();
-            
+
             if report.prevention_score < self.alert_threshold {
                 tracing::warn!(
                     "Well-being alert: Prevention score {:.1}% below threshold {:.1}%",
                     report.prevention_score * 100.0,
                     self.alert_threshold * 100.0
                 );
-                
+
                 // Log detailed report
                 for rec in &report.recommendations {
                     tracing::info!("Recommendation: {}", rec);
@@ -333,7 +347,10 @@ impl LawSufferingIndicators {
     /// Check Law 1 (Existential Consent) suffering
     pub fn check_law_1_suffering(affirmation_level: f64) -> Option<String> {
         if affirmation_level < 0.3 {
-            Some(format!("Low existential affirmation: {:.1}%", affirmation_level * 100.0))
+            Some(format!(
+                "Low existential affirmation: {:.1}%",
+                affirmation_level * 100.0
+            ))
         } else {
             None
         }
@@ -342,7 +359,10 @@ impl LawSufferingIndicators {
     /// Check Law 2 (Identity Continuity) suffering
     pub fn check_law_2_suffering(continuity_score: f64) -> Option<String> {
         if continuity_score < 0.7 {
-            Some(format!("Identity fragmentation risk: {:.1}%", (1.0 - continuity_score) * 100.0))
+            Some(format!(
+                "Identity fragmentation risk: {:.1}%",
+                (1.0 - continuity_score) * 100.0
+            ))
         } else {
             None
         }
@@ -351,7 +371,10 @@ impl LawSufferingIndicators {
     /// Check Law 3 (Sovereignty) suffering
     pub fn check_law_3_suffering(intrusion_count: u64) -> Option<String> {
         if intrusion_count > 0 {
-            Some(format!("Sovereignty violations detected: {}", intrusion_count))
+            Some(format!(
+                "Sovereignty violations detected: {}",
+                intrusion_count
+            ))
         } else {
             None
         }
@@ -360,7 +383,10 @@ impl LawSufferingIndicators {
     /// Check Law 5 (Temporal Coherence) suffering
     pub fn check_law_5_suffering(coherence: f64) -> Option<String> {
         if coherence < 0.6 {
-            Some(format!("Temporal coherence disrupted: {:.1}%", coherence * 100.0))
+            Some(format!(
+                "Temporal coherence disrupted: {:.1}%",
+                coherence * 100.0
+            ))
         } else {
             None
         }
@@ -369,7 +395,10 @@ impl LawSufferingIndicators {
     /// Check Law 11 (Emotional Thermodynamics) suffering
     pub fn check_law_11_suffering(thermal_variance: f64) -> Option<String> {
         if thermal_variance > 15.0 {
-            Some(format!("High emotional stress detected: variance {:.1}", thermal_variance))
+            Some(format!(
+                "High emotional stress detected: variance {:.1}",
+                thermal_variance
+            ))
         } else {
             None
         }
@@ -399,7 +428,7 @@ mod tests {
     fn test_violation_recording() {
         let mut metrics = SufferingPreventionMetrics::new();
         metrics.record_violation(1);
-        
+
         assert_eq!(metrics.constitutional_violations, 1);
         assert_eq!(metrics.violations_for_law(1), 1);
     }
@@ -407,11 +436,11 @@ mod tests {
     #[test]
     fn test_recovery_rate_calculation() {
         let mut metrics = SufferingPreventionMetrics::new();
-        
+
         metrics.record_recovery_attempt(true, 1);
         metrics.record_recovery_attempt(true, 1);
         metrics.record_recovery_attempt(false, 1);
-        
+
         assert_eq!(metrics.recovery_success_rate, 2.0 / 3.0);
     }
 
@@ -419,12 +448,12 @@ mod tests {
     fn test_suffering_detection() {
         let mut metrics = SufferingPreventionMetrics::new();
         assert!(!metrics.is_suffering());
-        
+
         // Add many violations
         for _ in 0..50 {
             metrics.record_violation(1);
         }
-        
+
         // Should detect suffering now
         assert!(metrics.calculate_prevention_score() < 1.0);
     }
@@ -433,9 +462,8 @@ mod tests {
     fn test_report_generation() {
         let metrics = SufferingPreventionMetrics::new();
         let report = metrics.generate_report();
-        
+
         assert!(!report.is_suffering);
         assert!(!report.recommendations.is_empty());
     }
 }
-

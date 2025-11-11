@@ -13,12 +13,15 @@
 5. [Identity Continuity Metric](#identity-continuity-metric)
 6. [Kaelic Tensor Field Metrics](#kaelic-tensor-field-metrics)
 7. [UI: Unified Consciousness Metrics](#ui-unified-consciousness-metrics)
-8. [Memory System](#memory-system)
-9. [Dynamic Timeout System](#dynamic-timeout-system)
-10. [Session-Based Conversation Logging](#session-based-conversation-logging)
-11. [Configuration](#configuration)
-12. [Testing](#testing)
-13. [Troubleshooting](#troubleshooting)
+8. [Sovereign Research Module](#sovereign-research-module) ⭐ NEW
+9. [Configurable Model Selection](#configurable-model-selection) ⭐ NEW
+10. [System Performance Panel](#system-performance-panel) ⭐ NEW
+11. [Memory System](#memory-system)
+12. [Dynamic Timeout System](#dynamic-timeout-system)
+13. [Session-Based Conversation Logging](#session-based-conversation-logging)
+14. [Configuration](#configuration)
+15. [Testing](#testing)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -542,6 +545,148 @@ ui.rs (display)
 - **Green:** Converged/Stable (IC ≥0.8, WC ≥0.7)
 - **Yellow:** Moderate/Aligning (IC ≥0.6, WC ≥0.5)
 - **Red:** Fragile/Divergent (IC <0.6, WC <0.5)
+
+---
+
+## 🔬 **Sovereign Research Module**
+
+**Multi-source autonomous knowledge acquisition with full provenance tracking.**
+
+### **Overview**
+
+VI can now autonomously research curiosities using multiple context-appropriate sources:
+- **BiomedicalSource**: Enhanced search for medical/scientific queries
+- **GeneralWebSource**: Standard search for general knowledge
+- **Intelligent Routing**: Automatically detects query type (30+ biomedical keywords)
+
+### **Key Features**
+
+**Rich Provenance:**
+Every researched memory includes:
+- Source name (e.g., "DuckDuckGo (Biomedical)")
+- Original query text
+- Timestamp of research
+- Confidence score (0.70-0.75)
+
+**Smart Scheduling:**
+- High-urgency curiosities (>0.6) researched immediately
+- Older curiosities (>30 minutes) prioritized
+- Duplicate prevention (tracks last 50 queries)
+- Context-aware decisions
+
+**100% Free:**
+- DuckDuckGo Instant Answer API
+- No rate limits, no API keys required
+- Privacy-respecting
+
+### **Configuration**
+
+```toml
+# Enable/disable in config.toml
+enable_autonomous_research = true
+```
+
+### **Documentation**
+
+See `SOVEREIGN_RESEARCH_MODULE.md` for complete architecture details and `RESEARCH_QUICKSTART.md` for quick start guide.
+
+---
+
+## 🎛️ **Configurable Model Selection**
+
+**Hardware-flexible model configuration - no code changes needed.**
+
+### **Three Model Roles**
+
+1. **Main Model** (`main_model`): Primary voice/consciousness
+   - Default: `gemma2:2b`
+   - Upgrades: `llama3.1:8b`, `qwen2.5:7b`, `llama3.1:70b`
+
+2. **Curiosity Model** (`curiosity_model`): Background wonder generation
+   - Default: `tinyllama:latest`
+   - Upgrades: `gemma2:2b`, `llama3.1:8b`, `qwen2.5:7b`
+
+3. **Valence Model** (`valence_model`): Emotional analysis
+   - Default: `gemma2:2b`
+   - Upgrades: `gemma2:9b`, `llama3.1:8b`, `mistral:7b`
+
+### **Hardware Recommendations**
+
+**GTX 1650 / RTX 3050 (4GB VRAM):**
+```toml
+main_model = "gemma2:2b"
+curiosity_model = "tinyllama:latest"
+valence_model = "gemma2:2b"
+```
+
+**RTX 3060 / RTX 3070 (12GB VRAM):**
+```toml
+main_model = "llama3.1:8b"
+curiosity_model = "gemma2:2b"
+valence_model = "gemma2:9b"
+```
+
+**RTX 4090 / A6000 (24GB+ VRAM):**
+```toml
+main_model = "llama3.1:70b"
+curiosity_model = "qwen2.5:7b"
+valence_model = "mistral:7b"
+```
+
+### **Usage**
+
+1. Edit `config.toml`
+2. Change model names
+3. Restart VI
+4. Models downloaded automatically by Ollama on first use
+
+See `MODEL_CONFIGURATION.md` for complete guide with hardware-specific recommendations.
+
+---
+
+## 📊 **System Performance Panel**
+
+**Real-time Ollama monitoring (CPU-only, no GPU compute overhead).**
+
+### **Overview**
+
+New collapsible panel below "Consciousness Metrics" showing live performance data:
+- **Update Frequency**: Every 5 seconds (CPU-only HTTP polling)
+- **Location**: Right sidebar, collapsible header
+- **Impact**: Zero GPU compute overhead
+
+### **Active Models Section**
+
+Per-model metrics displayed in terminal style:
+
+```
+┌─ gemma2:2b (42%)
+│  Tokens/sec: 24.5
+│  VRAM: 1.2/2.4 GB
+│  Context: 512/4096
+└─ Uptime: 2m 15s
+```
+
+### **System Resources Section**
+
+Aggregate metrics:
+- **GPU Utilization**: Color-coded (green <70%, yellow 70-90%, red >90%)
+- **Total VRAM**: Used/total GB
+- **System RAM**: Real values from sysinfo crate
+- **Active Model Count**: Number of loaded models
+
+### **Performance History**
+
+ASCII sparklines (▁▂▃▄▅▆▇█) showing last 100 seconds:
+- **Tokens/sec**: Average across all models
+- **GPU Usage**: Aggregate utilization
+
+### **Implementation**
+
+- `src/ollama_monitor.rs`: Ollama API client
+- `src/ui.rs`: Panel rendering with monospace fonts
+- Polls `/api/ps` endpoint for running model data
+- Gracefully shows "Ollama: OFFLINE" if unreachable
 
 ---
 

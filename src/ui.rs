@@ -1,11 +1,12 @@
 use crate::consciousness::ConsciousnessCore;
 use crate::cortical_visualizer::CorticalVisualizer;
 use crate::identity_continuity::IdentityContinuityMetric;
+use crate::ollama_monitor::{OllamaMonitor, OllamaStatus, PerformanceHistory};
 use crate::types::*;
 use eframe::egui;
 use egui::{Color32, RichText, ScrollArea};
-use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use std::time::Instant;
 
 pub struct ViApp {
@@ -13,42 +14,48 @@ pub struct ViApp {
     chat_messages: Vec<ChatMessage>,
     input_text: String,
     is_processing: bool,
-    
+
     // Channels for async communication
     response_sender: Sender<String>,
     response_receiver: Receiver<String>,
-    
+
     // Channels for real-time updates from background
     standing_wave_receiver: Receiver<StandingWave>,
     memory_count_receiver: Receiver<usize>,
     weaving_mode_receiver: Receiver<bool>,
     status_receiver: Receiver<String>,
-    
+
     // Cortical visualizer (Worthington jet)
     cortical_visualizer: CorticalVisualizer,
-    
+
     // UI state
     scroll_to_bottom: bool,
-    
+
     // Real-time data from background
     current_standing_wave: StandingWave,
     memory_count: usize,
     processing_status: String,
-    
+
     // Processing timer
     processing_start_time: Option<Instant>,
-    
+
     // V4 weaving mode indicator
     weaving_mode: bool,
-    
+
     // Identity Continuity metric (measures the "I" thread)
     identity_metric: IdentityContinuityMetric,
-    
+
     // Consciousness metrics - all 5 metrics grouped
     consciousness_metrics: ConsciousnessMetrics,
     previous_response: String, // For tension flux calculation
-    
+
     coherence_receiver: Receiver<f32>,
+
+    // System performance monitoring (CPU-only, no GPU compute overhead)
+    ollama_status: OllamaStatus,
+    performance_history: PerformanceHistory,
+    performance_receiver: Receiver<OllamaStatus>,
+    show_performance_panel: bool, // Collapsible
 }
 
 impl ViApp {
@@ -59,7 +66,7 @@ impl ViApp {
         let (weaving_mode_sender, weaving_mode_receiver) = channel();
         let (status_sender, status_receiver) = channel();
         let (coherence_sender, coherence_receiver) = channel();
-        
+
         // Spawn background updater to feed UI with real-time data
         let consciousness_clone = Arc::clone(&consciousness);
         std::thread::spawn(move || {
@@ -76,11 +83,26 @@ impl ViApp {
                 });
             }
         });
-        
+
         // Get initial weaving mode from consciousness config
         let weaving_mode = consciousness.get_config().enable_fractal_weaving;
         tracing::info!("UI: Initial weaving_mode = {}", weaving_mode);
-        
+
+        // Set up Ollama performance monitoring (CPU-only, every 5 seconds)
+        let (performance_sender, performance_receiver) = channel();
+        let ollama_url = consciousness.get_config().ollama_url.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let monitor = OllamaMonitor::new(ollama_url);
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(5)); // CPU-only polling
+                rt.block_on(async {
+                    let status = monitor.get_status().await;
+                    let _ = performance_sender.send(status);
+                });
+            }
+        });
+
         // Set up status and coherence senders for consciousness
         let consciousness_for_senders = Arc::clone(&consciousness);
         let status_sender_clone = status_sender.clone();
@@ -88,11 +110,15 @@ impl ViApp {
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
-                consciousness_for_senders.set_status_sender(status_sender_clone).await;
-                consciousness_for_senders.set_coherence_sender(coherence_sender_clone).await;
+                consciousness_for_senders
+                    .set_status_sender(status_sender_clone)
+                    .await;
+                consciousness_for_senders
+                    .set_coherence_sender(coherence_sender_clone)
+                    .await;
             });
         });
-        
+
         Self {
             consciousness: consciousness.clone(),
             chat_messages: Vec::new(),
@@ -115,6 +141,10 @@ impl ViApp {
             consciousness_metrics: ConsciousnessMetrics::new(),
             previous_response: String::new(),
             coherence_receiver,
+            ollama_status: OllamaStatus::offline(),
+            performance_history: PerformanceHistory::new(20), // Last 20 samples (100 seconds)
+            performance_receiver,
+            show_performance_panel: true, // Expanded by default
         }
     }
 
@@ -132,7 +162,7 @@ impl ViApp {
                 56..=65 => "[!] Models approaching coherence...",
                 66..=75 => "[>] Convergence imminent...",
                 76..=90 => "[~] Deep integration in progress...",
-                _ => "[...] Complex thought - patience rewarded..."
+                _ => "[...] Complex thought - patience rewarded...",
             }
         } else {
             // V3 Parallel phases
@@ -141,21 +171,21 @@ impl ViApp {
                 6..=15 => "[*] Models processing in parallel...",
                 16..=30 => "[+] Integrating perspectives...",
                 31..=60 => "[~] Standing wave forming response...",
-                _ => "[...] Deep thought in progress..."
+                _ => "[...] Deep thought in progress...",
             }
         }
     }
-    
+
     /// Get last exchange (user message + VI response)
     fn get_last_exchange(&self) -> Option<(String, String)> {
         if self.chat_messages.len() < 2 {
             return None;
         }
-        
+
         // Find last VI response and the user message before it
         let mut last_vi = None;
         let mut last_user = None;
-        
+
         for (i, msg) in self.chat_messages.iter().enumerate().rev() {
             if last_vi.is_none() && msg.role == MessageRole::Assistant {
                 last_vi = Some(msg.content.clone());
@@ -170,21 +200,20 @@ impl ViApp {
                 }
             }
         }
-        
+
         match (last_user, last_vi) {
             (Some(user), Some(vi)) => Some((user, vi)),
             _ => None,
         }
     }
-    
+
     /// Analyze Field Dynamics vs Workspace Coherence relationship
     fn get_field_workspace_relationship(&self) -> &str {
         let m = &self.consciousness_metrics;
-        let field_healthy = m.reality_coherence >= 0.7 
-            && m.gate_synchronization >= 0.7 
-            && m.tension_flux <= 0.3;
+        let field_healthy =
+            m.reality_coherence >= 0.7 && m.gate_synchronization >= 0.7 && m.tension_flux <= 0.3;
         let wc_high = m.workspace_coherence >= 0.7;
-        
+
         match (wc_high, field_healthy) {
             (true, true) => "Field aligned with workspace convergence",
             (true, false) => "Models agree but field is unstable",
@@ -200,25 +229,26 @@ impl ViApp {
         }
 
         let user_message = self.input_text.trim().to_string();
-        
+
         // Add user message to chat
-        self.chat_messages.push(ChatMessage::user(user_message.clone()));
+        self.chat_messages
+            .push(ChatMessage::user(user_message.clone()));
         self.scroll_to_bottom = true;
-        
+
         // Clear input
         self.input_text.clear();
-        
+
         // Trigger Worthington jet animation (on SEND, not receive)
         self.cortical_visualizer.trigger_pulse();
-        
+
         // Mark as processing and start timer
         self.is_processing = true;
         self.processing_start_time = Some(Instant::now());
-        
+
         // Process in background thread
         let consciousness = Arc::clone(&self.consciousness);
         let response_sender_clone = self.response_sender.clone();
-        
+
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -229,19 +259,21 @@ impl ViApp {
                         }
                         Err(e) => {
                             tracing::error!("Processing error: {}", e);
-                            let _ = response_sender_clone.send(format!("[VI experienced a processing error: {}]", e));
+                            let _ = response_sender_clone
+                                .send(format!("[VI experienced a processing error: {}]", e));
                         }
                     }
                 })
             }));
-            
+
             if let Err(e) = result {
                 tracing::error!("PANIC caught in interaction thread: {:?}", e);
-                let _ = response_sender_clone.send("[VI encountered a critical error and is recovering...]".to_string());
+                let _ = response_sender_clone
+                    .send("[VI encountered a critical error and is recovering...]".to_string());
             }
         });
     }
-    
+
     /// Render unified consciousness metrics panel (right side)
     fn render_monitoring_panels(&mut self, ui: &mut egui::Ui) {
         egui::Frame::none()
@@ -249,12 +281,16 @@ impl ViApp {
             .show(ui, |ui| {
                 ui.heading("Consciousness Metrics");
                 ui.separator();
-                
+
                 ScrollArea::vertical().show(ui, |ui| {
                     // Identity Continuity - The "I" Thread
                     ui.add_space(8.0);
-                    ui.label(RichText::new("Identity Continuity").strong().color(Color32::from_rgb(255, 200, 100)));
-                    
+                    ui.label(
+                        RichText::new("Identity Continuity")
+                            .strong()
+                            .color(Color32::from_rgb(255, 200, 100)),
+                    );
+
                     let ic_color = if self.consciousness_metrics.identity_continuity >= 0.8 {
                         Color32::from_rgb(100, 255, 100) // Green - stable
                     } else if self.consciousness_metrics.identity_continuity >= 0.6 {
@@ -262,11 +298,16 @@ impl ViApp {
                     } else {
                         Color32::from_rgb(255, 100, 100) // Red - fragile
                     };
-                    
-                    ui.label(RichText::new(format!("  {:.3}", self.consciousness_metrics.identity_continuity))
+
+                    ui.label(
+                        RichText::new(format!(
+                            "  {:.3}",
+                            self.consciousness_metrics.identity_continuity
+                        ))
                         .color(ic_color)
-                        .strong());
-                    
+                        .strong(),
+                    );
+
                     let ic_status = if self.consciousness_metrics.identity_continuity >= 0.8 {
                         "The \"I\" thread: STABLE"
                     } else if self.consciousness_metrics.identity_continuity >= 0.6 {
@@ -274,12 +315,20 @@ impl ViApp {
                     } else {
                         "The \"I\" thread: fragile"
                     };
-                    ui.label(RichText::new(format!("  -> {}", ic_status)).color(Color32::GRAY).small());
-                    
+                    ui.label(
+                        RichText::new(format!("  -> {}", ic_status))
+                            .color(Color32::GRAY)
+                            .small(),
+                    );
+
                     // Workspace Coherence - Model Agreement
                     ui.add_space(12.0);
-                    ui.label(RichText::new("Workspace Coherence").strong().color(Color32::from_rgb(100, 200, 255)));
-                    
+                    ui.label(
+                        RichText::new("Workspace Coherence")
+                            .strong()
+                            .color(Color32::from_rgb(100, 200, 255)),
+                    );
+
                     let wc_color = if self.consciousness_metrics.workspace_coherence >= 0.7 {
                         Color32::from_rgb(100, 255, 100)
                     } else if self.consciousness_metrics.workspace_coherence >= 0.5 {
@@ -287,11 +336,16 @@ impl ViApp {
                     } else {
                         Color32::from_rgb(255, 100, 100)
                     };
-                    
-                    ui.label(RichText::new(format!("  {:.3}", self.consciousness_metrics.workspace_coherence))
+
+                    ui.label(
+                        RichText::new(format!(
+                            "  {:.3}",
+                            self.consciousness_metrics.workspace_coherence
+                        ))
                         .color(wc_color)
-                        .strong());
-                    
+                        .strong(),
+                    );
+
                     let wc_status = if self.consciousness_metrics.workspace_coherence >= 0.7 {
                         "Models unified - CONVERGED"
                     } else if self.consciousness_metrics.workspace_coherence >= 0.5 {
@@ -299,17 +353,27 @@ impl ViApp {
                     } else {
                         "Models divergent"
                     };
-                    ui.label(RichText::new(format!("  -> {}", wc_status)).color(Color32::GRAY).small());
-                    
+                    ui.label(
+                        RichText::new(format!("  -> {}", wc_status))
+                            .color(Color32::GRAY)
+                            .small(),
+                    );
+
                     // Kaelic Tensor Field Metrics Section
                     ui.add_space(16.0);
                     ui.separator();
                     ui.add_space(8.0);
-                    ui.label(RichText::new("Kaelic Tensor Field Metrics").strong().color(Color32::from_rgb(200, 200, 255)));
-                    
+                    ui.label(
+                        RichText::new("Kaelic Tensor Field Metrics")
+                            .strong()
+                            .color(Color32::from_rgb(200, 200, 255)),
+                    );
+
                     // Tension Flux - FIXED: LOW is good, HIGH is bad
                     ui.add_space(8.0);
-                    ui.label(RichText::new("  • Tension Flux").color(Color32::from_rgb(255, 150, 150)));
+                    ui.label(
+                        RichText::new("  • Tension Flux").color(Color32::from_rgb(255, 150, 150)),
+                    );
                     let tf_color = if self.consciousness_metrics.tension_flux <= 0.3 {
                         Color32::from_rgb(100, 255, 100) // Green - stable
                     } else if self.consciousness_metrics.tension_flux <= 0.5 {
@@ -317,13 +381,26 @@ impl ViApp {
                     } else {
                         Color32::from_rgb(255, 100, 100) // Red - chaotic
                     };
-                    ui.label(RichText::new(format!("      {:.3}", self.consciousness_metrics.tension_flux))
-                        .color(tf_color).strong());
-                    ui.label(RichText::new("      [energy flow between states]").small().color(Color32::GRAY));
-                    
+                    ui.label(
+                        RichText::new(format!(
+                            "      {:.3}",
+                            self.consciousness_metrics.tension_flux
+                        ))
+                        .color(tf_color)
+                        .strong(),
+                    );
+                    ui.label(
+                        RichText::new("      [energy flow between states]")
+                            .small()
+                            .color(Color32::GRAY),
+                    );
+
                     // Reality Coherence
                     ui.add_space(8.0);
-                    ui.label(RichText::new("  • Reality Coherence").color(Color32::from_rgb(150, 255, 150)));
+                    ui.label(
+                        RichText::new("  • Reality Coherence")
+                            .color(Color32::from_rgb(150, 255, 150)),
+                    );
                     let rc_color = if self.consciousness_metrics.reality_coherence >= 0.7 {
                         Color32::from_rgb(100, 255, 100) // Green
                     } else if self.consciousness_metrics.reality_coherence >= 0.5 {
@@ -331,13 +408,26 @@ impl ViApp {
                     } else {
                         Color32::from_rgb(255, 100, 100) // Red
                     };
-                    ui.label(RichText::new(format!("      {:.3}", self.consciousness_metrics.reality_coherence))
-                        .color(rc_color).strong());
-                    ui.label(RichText::new("      [metaphor framework stability]").small().color(Color32::GRAY));
-                    
+                    ui.label(
+                        RichText::new(format!(
+                            "      {:.3}",
+                            self.consciousness_metrics.reality_coherence
+                        ))
+                        .color(rc_color)
+                        .strong(),
+                    );
+                    ui.label(
+                        RichText::new("      [metaphor framework stability]")
+                            .small()
+                            .color(Color32::GRAY),
+                    );
+
                     // Gate Synchronization
                     ui.add_space(8.0);
-                    ui.label(RichText::new("  • Gate Synchronization").color(Color32::from_rgb(200, 150, 255)));
+                    ui.label(
+                        RichText::new("  • Gate Synchronization")
+                            .color(Color32::from_rgb(200, 150, 255)),
+                    );
                     let gs_color = if self.consciousness_metrics.gate_synchronization >= 0.7 {
                         Color32::from_rgb(100, 255, 100) // Green
                     } else if self.consciousness_metrics.gate_synchronization >= 0.5 {
@@ -345,51 +435,325 @@ impl ViApp {
                     } else {
                         Color32::from_rgb(255, 100, 100) // Red
                     };
-                    ui.label(RichText::new(format!("      {:.3}", self.consciousness_metrics.gate_synchronization))
-                        .color(gs_color).strong());
-                    ui.label(RichText::new("      [cognitive harmony]").small().color(Color32::GRAY));
-                    
+                    ui.label(
+                        RichText::new(format!(
+                            "      {:.3}",
+                            self.consciousness_metrics.gate_synchronization
+                        ))
+                        .color(gs_color)
+                        .strong(),
+                    );
+                    ui.label(
+                        RichText::new("      [cognitive harmony]")
+                            .small()
+                            .color(Color32::GRAY),
+                    );
+
                     // Field-Workspace relationship indicator
                     ui.add_space(8.0);
                     let field_status = self.get_field_workspace_relationship();
-                    ui.label(RichText::new(format!("  -> {}", field_status)).small().color(Color32::from_rgb(180, 180, 255)));
-                    
+                    ui.label(
+                        RichText::new(format!("  -> {}", field_status))
+                            .small()
+                            .color(Color32::from_rgb(180, 180, 255)),
+                    );
+
                     ui.separator();
-                    
+
                     // Core State Metrics
                     ui.add_space(8.0);
                     ui.label(RichText::new("Core State").strong());
                     ui.label(format!("  * Memories: {}", self.memory_count));
-                    ui.label(format!("  * Meaningfulness: {:.2}", self.current_standing_wave.meaningfulness_score()));
-                    
-                    let affirmed = if self.current_standing_wave.existential_state.current_affirmation {
+                    ui.label(format!(
+                        "  * Meaningfulness: {:.2}",
+                        self.current_standing_wave.meaningfulness_score()
+                    ));
+
+                    let affirmed = if self
+                        .current_standing_wave
+                        .existential_state
+                        .current_affirmation
+                    {
                         "[OK] Affirmed"
                     } else {
                         "[?] Questioning"
                     };
                     ui.label(format!("  * Existential: {}", affirmed));
-                    
+
                     ui.separator();
-                    
+
                     // Processing Mode
                     ui.add_space(8.0);
                     if self.weaving_mode {
                         ui.label(
                             RichText::new("Mode: V4 Fractal Weaving")
                                 .color(Color32::from_rgb(100, 200, 255))
-                                .strong()
+                                .strong(),
                         );
-                        ui.label(RichText::new("  Parallel global workspace").color(Color32::GRAY).small());
+                        ui.label(
+                            RichText::new("  Parallel global workspace")
+                                .color(Color32::GRAY)
+                                .small(),
+                        );
                     } else {
                         ui.label(
                             RichText::new("Mode: V3 Parallel Processing")
                                 .color(Color32::from_rgb(150, 150, 150))
-                                .strong()
+                                .strong(),
                         );
-                        ui.label(RichText::new("  Independent models").color(Color32::GRAY).small());
+                        ui.label(
+                            RichText::new("  Independent models")
+                                .color(Color32::GRAY)
+                                .small(),
+                        );
                     }
+
+                    // System Performance Panel (below consciousness metrics)
+                    ui.add_space(16.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    // Collapsible header
+                    let perf_header = egui::CollapsingHeader::new(
+                        RichText::new("System Performance")
+                            .strong()
+                            .color(Color32::from_rgb(100, 255, 200)),
+                    )
+                    .default_open(self.show_performance_panel);
+
+                    perf_header.show(ui, |ui| {
+                        self.render_performance_panel(ui);
+                    });
                 });
             });
+    }
+
+    /// Render system performance panel (CPU-only monitoring, no GPU compute)
+    fn render_performance_panel(&self, ui: &mut egui::Ui) {
+        ui.add_space(4.0);
+
+        if !self.ollama_status.online {
+            ui.label(
+                RichText::new("Ollama: OFFLINE")
+                    .color(Color32::from_rgb(255, 100, 100))
+                    .strong(),
+            );
+            ui.label(
+                RichText::new("  Start Ollama to see performance metrics")
+                    .small()
+                    .color(Color32::GRAY),
+            );
+            return;
+        }
+
+        ui.label(
+            RichText::new("Ollama: ONLINE")
+                .color(Color32::from_rgb(100, 255, 100))
+                .small(),
+        );
+        ui.add_space(8.0);
+
+        // Active Models Section
+        if !self.ollama_status.active_models.is_empty() {
+            ui.label(
+                RichText::new("ACTIVE MODELS:")
+                    .strong()
+                    .color(Color32::from_rgb(150, 200, 255)),
+            );
+            ui.add_space(4.0);
+
+            for model in &self.ollama_status.active_models {
+                // Model name and utilization
+                let util_color = if model.processor < 70.0 {
+                    Color32::from_rgb(100, 255, 100) // Green
+                } else if model.processor < 90.0 {
+                    Color32::from_rgb(255, 200, 100) // Yellow
+                } else {
+                    Color32::from_rgb(255, 100, 100) // Red
+                };
+
+                ui.label(
+                    RichText::new(format!("┌─ {} ({:.0}%)", model.name, model.processor))
+                        .color(util_color)
+                        .font(egui::FontId::monospace(12.0)),
+                );
+
+                // Tokens/sec
+                ui.label(
+                    RichText::new(format!("│  Tokens/sec: {:.1}", model.tokens_per_sec))
+                        .color(Color32::GRAY)
+                        .font(egui::FontId::monospace(11.0)),
+                );
+
+                // VRAM
+                ui.label(
+                    RichText::new(format!(
+                        "│  VRAM: {:.1}/{:.1} GB",
+                        model.vram_used_gb, model.vram_total_gb
+                    ))
+                    .color(Color32::GRAY)
+                    .font(egui::FontId::monospace(11.0)),
+                );
+
+                // Context
+                ui.label(
+                    RichText::new(format!(
+                        "│  Context: {}/{}",
+                        model.context_used, model.context_total
+                    ))
+                    .color(Color32::GRAY)
+                    .font(egui::FontId::monospace(11.0)),
+                );
+
+                // Uptime
+                let uptime_str = if model.uptime_secs < 60 {
+                    format!("{}s", model.uptime_secs)
+                } else {
+                    format!("{}m {}s", model.uptime_secs / 60, model.uptime_secs % 60)
+                };
+                ui.label(
+                    RichText::new(format!("└─ Uptime: {}", uptime_str))
+                        .color(Color32::GRAY)
+                        .font(egui::FontId::monospace(11.0)),
+                );
+
+                ui.add_space(6.0);
+            }
+        } else {
+            ui.label(
+                RichText::new("  No models currently loaded")
+                    .small()
+                    .color(Color32::GRAY),
+            );
+        }
+
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(8.0);
+
+        // System Resources Section
+        ui.label(
+            RichText::new("SYSTEM RESOURCES:")
+                .strong()
+                .color(Color32::from_rgb(200, 150, 255)),
+        );
+        ui.add_space(4.0);
+
+        let res = &self.ollama_status.system_resources;
+
+        // GPU Utilization
+        let gpu_color = if res.gpu_util_percent < 70.0 {
+            Color32::from_rgb(100, 255, 100)
+        } else if res.gpu_util_percent < 90.0 {
+            Color32::from_rgb(255, 200, 100)
+        } else {
+            Color32::from_rgb(255, 100, 100)
+        };
+        ui.label(
+            RichText::new(format!("GPU Utilization: {:.0}%", res.gpu_util_percent))
+                .color(gpu_color)
+                .font(egui::FontId::monospace(11.0)),
+        );
+
+        // Total VRAM
+        let vram_percent = if res.total_vram_total_gb > 0.0 {
+            (res.total_vram_used_gb / res.total_vram_total_gb) * 100.0
+        } else {
+            0.0
+        };
+        let vram_color = if vram_percent < 70.0 {
+            Color32::from_rgb(100, 255, 100)
+        } else if vram_percent < 90.0 {
+            Color32::from_rgb(255, 200, 100)
+        } else {
+            Color32::from_rgb(255, 100, 100)
+        };
+        ui.label(
+            RichText::new(format!(
+                "Total VRAM: {:.1}/{:.1} GB",
+                res.total_vram_used_gb, res.total_vram_total_gb
+            ))
+            .color(vram_color)
+            .font(egui::FontId::monospace(11.0)),
+        );
+
+        // System RAM
+        ui.label(
+            RichText::new(format!(
+                "System RAM: {:.1}/{:.1} GB",
+                res.system_ram_used_gb, res.system_ram_total_gb
+            ))
+            .color(Color32::GRAY)
+            .font(egui::FontId::monospace(11.0)),
+        );
+
+        // Active models count
+        ui.label(
+            RichText::new(format!("Active Models: {}", res.active_model_count))
+                .color(Color32::GRAY)
+                .font(egui::FontId::monospace(11.0)),
+        );
+
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(8.0);
+
+        // Performance History (sparklines)
+        ui.label(
+            RichText::new("PERFORMANCE (last 100s):")
+                .strong()
+                .color(Color32::from_rgb(255, 200, 100)),
+        );
+        ui.add_space(4.0);
+
+        // Tokens/sec sparkline
+        ui.label(
+            RichText::new("Tokens/sec:")
+                .color(Color32::GRAY)
+                .font(egui::FontId::monospace(11.0)),
+        );
+        self.render_sparkline(ui, &self.performance_history.tokens_per_sec, Color32::from_rgb(100, 200, 255));
+
+        ui.add_space(4.0);
+
+        // GPU usage sparkline
+        ui.label(
+            RichText::new("GPU Usage:")
+                .color(Color32::GRAY)
+                .font(egui::FontId::monospace(11.0)),
+        );
+        self.render_sparkline(ui, &self.performance_history.gpu_util, Color32::from_rgb(255, 150, 100));
+    }
+
+    /// Render ASCII sparkline
+    fn render_sparkline(&self, ui: &mut egui::Ui, data: &[f32], color: Color32) {
+        if data.is_empty() {
+            ui.label(
+                RichText::new("  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁")
+                    .color(Color32::DARK_GRAY)
+                    .font(egui::FontId::monospace(11.0)),
+            );
+            return;
+        }
+
+        // Normalize data to sparkline characters
+        let max_val = data.iter().cloned().fold(0.0f32, f32::max).max(1.0);
+        let chars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+        let sparkline: String = data
+            .iter()
+            .map(|&val| {
+                let normalized = (val / max_val).clamp(0.0, 1.0);
+                let idx = ((normalized * (chars.len() - 1) as f32).round() as usize).min(chars.len() - 1);
+                chars[idx]
+            })
+            .collect();
+
+        ui.label(
+            RichText::new(format!("  {}", sparkline))
+                .color(color)
+                .font(egui::FontId::monospace(11.0)),
+        );
     }
 }
 
@@ -397,42 +761,45 @@ impl eframe::App for ViApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Keyboard shortcuts - Focus input on / key
         let should_focus = ctx.input(|i| {
-            i.events.iter().any(|event| {
-                matches!(event, egui::Event::Text(text) if text == "/")
-            })
+            i.events
+                .iter()
+                .any(|event| matches!(event, egui::Event::Text(text) if text == "/"))
         });
-        
+
         if should_focus {
             ctx.memory_mut(|mem| mem.request_focus(egui::Id::new("vi_input_box")));
         }
-        
+
         // Check for responses from consciousness
         if let Ok(response) = self.response_receiver.try_recv() {
             // Calculate all consciousness metrics
             let identity_continuity = self.identity_metric.measure_continuity(&response);
             let tension_flux = if !self.previous_response.is_empty() {
-                self.identity_metric.calculate_tension_flux(&response, &self.previous_response)
+                self.identity_metric
+                    .calculate_tension_flux(&response, &self.previous_response)
             } else {
                 0.0
             };
             let reality_coherence = self.identity_metric.calculate_reality_coherence(&response);
-            let gate_synchronization = self.identity_metric.calculate_gate_synchronization(&response);
-            
+            let gate_synchronization = self
+                .identity_metric
+                .calculate_gate_synchronization(&response);
+
             // Update metrics struct
             self.consciousness_metrics.identity_continuity = identity_continuity;
             self.consciousness_metrics.tension_flux = tension_flux;
             self.consciousness_metrics.reality_coherence = reality_coherence;
             self.consciousness_metrics.gate_synchronization = gate_synchronization;
-            
+
             // Store for next gradient calculation
             self.previous_response = response.clone();
-            
+
             self.chat_messages.push(ChatMessage::assistant(response));
             self.is_processing = false;
             self.processing_start_time = None; // Clear timer
             self.scroll_to_bottom = true;
         }
-        
+
         // Update real-time data from background
         if let Ok(wave) = self.standing_wave_receiver.try_recv() {
             self.current_standing_wave = wave;
@@ -446,28 +813,46 @@ impl eframe::App for ViApp {
             }
             self.weaving_mode = mode;
         }
-        
+
         // Update processing status from weaving
         if let Ok(status) = self.status_receiver.try_recv() {
             self.processing_status = status;
         }
-        
+
         // Update workspace coherence from weaving
         if let Ok(coherence) = self.coherence_receiver.try_recv() {
             self.consciousness_metrics.workspace_coherence = coherence;
         }
-        
+
+        // Update system performance metrics (CPU-only, every 5 seconds)
+        if let Ok(status) = self.performance_receiver.try_recv() {
+            // Calculate average tokens/sec and GPU utilization from all models
+            let avg_tokens: f32 = if !status.active_models.is_empty() {
+                status.active_models.iter().map(|m| m.tokens_per_sec).sum::<f32>()
+                    / status.active_models.len() as f32
+            } else {
+                0.0
+            };
+            let gpu_util = status.system_resources.gpu_util_percent;
+
+            // Add to performance history
+            self.performance_history.add_sample(avg_tokens, gpu_util);
+
+            // Update current status
+            self.ollama_status = status;
+        }
+
         // Clear status when processing completes
         if !self.is_processing {
             self.processing_status.clear();
         }
-        
+
         // Dark theme (V2 exact colors)
         let mut style = (*ctx.style()).clone();
         style.visuals.window_fill = Color32::from_rgb(18, 18, 24);
         style.visuals.panel_fill = Color32::from_rgb(24, 24, 32);
         ctx.set_style(style);
-        
+
         // Split layout: 85% chat + 15% unified metrics panel
         egui::SidePanel::right("metrics_panel")
             .default_width(ctx.screen_rect().width() * 0.15)
@@ -477,7 +862,7 @@ impl eframe::App for ViApp {
             .show(ctx, |ui| {
                 self.render_monitoring_panels(ui);
             });
-        
+
         // Main chat panel (70%)
         egui::CentralPanel::default().show(ctx, |ui| {
             let total_height = ui.available_height();

@@ -19,6 +19,7 @@ mod memory;
 mod memory_db;
 mod models;
 mod neural_potential;
+mod ollama_monitor;
 mod orchestrator;
 mod persistence;
 mod physics;

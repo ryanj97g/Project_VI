@@ -1,7 +1,6 @@
 /// Conversation Logger - Session-based conversation logging
-/// 
+///
 /// Creates dedicated log files for each conversation session with clean organization
-
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
 use std::fs::{self, File, OpenOptions};
@@ -66,13 +65,13 @@ impl ConversationLogger {
             logs_folder: logs_folder.to_string(),
         })
     }
-    
+
     /// Lazy file creation - only create when first message is logged
     fn ensure_file_created(&mut self) -> Result<()> {
         if self.file.is_some() {
             return Ok(()); // Already created
         }
-        
+
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)
@@ -84,15 +83,19 @@ impl ConversationLogger {
         writeln!(file, "=")?;
         writeln!(file, "VI CONVERSATION SESSION")?;
         writeln!(file, "=")?;
-        writeln!(file, "Session Start: {}", self.session_start.format("%Y-%m-%d %H:%M:%S"))?;
+        writeln!(
+            file,
+            "Session Start: {}",
+            self.session_start.format("%Y-%m-%d %H:%M:%S")
+        )?;
         writeln!(file, "=")?;
         writeln!(file)?;
 
         file.flush()?;
-        
+
         self.file = Some(file);
         tracing::info!("📝 Session log created: {}", self.log_file_path.display());
-        
+
         Ok(())
     }
 
@@ -197,7 +200,11 @@ impl ConversationLogger {
             writeln!(file, "SESSION END")?;
             writeln!(file, "=")?;
             writeln!(file)?;
-            writeln!(file, "Session End: {}", session_end.format("%Y-%m-%d %H:%M:%S"))?;
+            writeln!(
+                file,
+                "Session End: {}",
+                session_end.format("%Y-%m-%d %H:%M:%S")
+            )?;
             writeln!(
                 file,
                 "Duration: {} minutes {} seconds",
@@ -210,7 +217,7 @@ impl ConversationLogger {
             writeln!(file, "=")?;
 
             file.flush()?;
-            
+
             tracing::info!("📝 Session log closed: {}", self.log_file_path.display());
         }
 
@@ -271,7 +278,9 @@ mod tests {
 
         assert!(logger.log_user("Hello VI").is_ok());
         assert!(logger.log_vi("Hello! How are you?").is_ok());
-        assert!(logger.log_system_event("Background pulse completed").is_ok());
+        assert!(logger
+            .log_system_event("Background pulse completed")
+            .is_ok());
         assert!(logger.close_session().is_ok());
 
         // Verify file exists and has content
@@ -287,4 +296,3 @@ mod tests {
         let _ = fs::remove_dir_all(test_folder);
     }
 }
-

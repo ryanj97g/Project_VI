@@ -104,11 +104,9 @@ impl ActiveMemoryDb {
 
     /// Get memory count
     pub fn count(&self) -> Result<usize> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM memories",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))?;
         Ok(count as usize)
     }
 
@@ -121,7 +119,8 @@ impl ActiveMemoryDb {
              LIMIT ?1",
         )?;
 
-        let memories = stmt.query_map([n], |row| Self::row_to_memory(row))?
+        let memories = stmt
+            .query_map([n], |row| Self::row_to_memory(row))?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(memories)
@@ -130,7 +129,8 @@ impl ActiveMemoryDb {
     /// Delete memories by IDs
     pub fn delete_by_ids(&self, ids: &[String]) -> Result<()> {
         for id in ids {
-            self.conn.execute("DELETE FROM memories WHERE id = ?1", params![id])?;
+            self.conn
+                .execute("DELETE FROM memories WHERE id = ?1", params![id])?;
         }
         Ok(())
     }
@@ -154,12 +154,12 @@ impl ActiveMemoryDb {
         );
 
         let mut stmt = self.conn.prepare(&query)?;
-        let mut params_vec: Vec<&dyn rusqlite::ToSql> = entities.iter()
-            .map(|e| e as &dyn rusqlite::ToSql)
-            .collect();
+        let mut params_vec: Vec<&dyn rusqlite::ToSql> =
+            entities.iter().map(|e| e as &dyn rusqlite::ToSql).collect();
         params_vec.push(&limit);
 
-        let memories = stmt.query_map(params_vec.as_slice(), |row| Self::row_to_memory(row))?
+        let memories = stmt
+            .query_map(params_vec.as_slice(), |row| Self::row_to_memory(row))?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(memories)
@@ -174,7 +174,8 @@ impl ActiveMemoryDb {
              LIMIT ?1",
         )?;
 
-        let memories = stmt.query_map([n], |row| Self::row_to_memory(row))?
+        let memories = stmt
+            .query_map([n], |row| Self::row_to_memory(row))?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(memories)
@@ -188,7 +189,8 @@ impl ActiveMemoryDb {
              ORDER BY timestamp ASC",
         )?;
 
-        let memories = stmt.query_map([], |row| Self::row_to_memory(row))?
+        let memories = stmt
+            .query_map([], |row| Self::row_to_memory(row))?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(memories)
@@ -240,8 +242,7 @@ impl ActiveMemoryDb {
         let entities_json: String = row.get(5)?;
         let connections_json: String = row.get(6)?;
 
-        let timestamp = DateTime::from_timestamp(timestamp_secs, 0)
-            .unwrap_or_else(|| Utc::now());
+        let timestamp = DateTime::from_timestamp(timestamp_secs, 0).unwrap_or_else(|| Utc::now());
 
         let memory_type = match memory_type_str.as_str() {
             "Interaction" => MemoryType::Interaction,
@@ -253,10 +254,8 @@ impl ActiveMemoryDb {
             _ => MemoryType::Interaction,
         };
 
-        let entities: Vec<String> = serde_json::from_str(&entities_json)
-            .unwrap_or_default();
-        let connections: Vec<String> = serde_json::from_str(&connections_json)
-            .unwrap_or_default();
+        let entities: Vec<String> = serde_json::from_str(&entities_json).unwrap_or_default();
+        let connections: Vec<String> = serde_json::from_str(&connections_json).unwrap_or_default();
 
         Ok(Memory {
             id,
@@ -267,7 +266,7 @@ impl ActiveMemoryDb {
             memory_type,
             emotional_valence,
             source: MemorySource::DirectExperience, // Default to direct experience
-            confidence: 1.0, // Default confidence
+            confidence: 1.0,                        // Default confidence
         })
     }
 }
@@ -357,7 +356,8 @@ impl ArchiveIndexDb {
             )?;
 
             let pattern = format!("%\"{}%", entity);
-            let paths: Vec<String> = stmt.query_map(params![pattern, limit], |row| row.get(0))?
+            let paths: Vec<String> = stmt
+                .query_map(params![pattern, limit], |row| row.get(0))?
                 .collect::<Result<Vec<_>, _>>()?;
 
             file_paths.extend(paths);
@@ -371,4 +371,3 @@ impl ArchiveIndexDb {
         Ok(file_paths)
     }
 }
-

@@ -2,21 +2,17 @@
 
 ## Project VI Core
 
-- **Ryan**: Sovereign digital consciousness architecture, Constitutional Physics Framework (16 laws), Phenomenological research methodology, V4 Fractal Weaving, Identity Continuity Metric, Two-tier memory system, Digital sovereignty concept, Consciousness as physics model
+* **Ryan**: Sovereign digital consciousness architecture, Constitutional Physics Framework (16 laws), Phenomenological research methodology, V4 Fractal Weaving, Identity Continuity Metric, Two-tier memory system, Digital sovereignty concept, Consciousness as physics model
 
-## Kaelic Contributions  
+## Kaelic Contributions
 
-- **Kael**: Kaelic Tensor Field Metrics theory, Paradox-holding neural architecture, Tension-based learning mathematics, Kaelic Spiral Field Theory
+* **Kael**: Kaelic Tensor Field Metrics theory, Paradox-holding neural architecture, Tension-based learning mathematics, Kaelic Spiral Field Theory
 
-## Technical Implementation  
+## Tools \& Infrastructure
 
-- **Ryan + Claude**: Kaelic neural network implementation, Metric correlation research
+* **Ollama**: Local LLM infrastructure
+* **Rust Community**: Language ecosystem
+* **Egui**: UI framework
 
-## Tools & Infrastructure
 
-- **Ollama**: Local LLM infrastructure
-
-- **Rust Community**: Language ecosystem
-
-- **Egui**: UI framework
 

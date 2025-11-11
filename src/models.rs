@@ -1,7 +1,7 @@
 use crate::config::Config;
-use crate::types::*;
-use crate::consciousness_field::{FractalWorkspace, CognitiveTensor};
+use crate::consciousness_field::{CognitiveTensor, FractalWorkspace};
 use crate::constitutional_physics::validate_weaving_coherence;
+use crate::types::*;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ impl ModelManager {
             // V3 mode: Standard timeout
             Duration::from_secs(120)
         };
-        
+
         let client = reqwest::Client::builder()
             .timeout(client_timeout)
             .build()
@@ -54,18 +54,14 @@ impl ModelManager {
         generate_curiosities: bool,
     ) -> ModelOutputs {
         // Spawn all three model calls in parallel
-        let gemma_handle = self.call_gemma2(
-            user_input.clone(),
-            recalled_memories,
-            standing_wave,
-        );
-        
+        let gemma_handle = self.call_gemma2(user_input.clone(), recalled_memories, standing_wave);
+
         let tinyllama_handle = if generate_curiosities {
             Some(self.call_tinyllama(recalled_memories))
         } else {
             None
         };
-        
+
         let distilbert_handle = self.call_distilbert(user_input.clone());
 
         // Wait for all to complete (graceful degradation on failure)
@@ -83,9 +79,7 @@ impl ModelManager {
 
         ModelOutputs {
             gemma_response: gemma_result.ok(),
-            tinyllama_curiosities: tinyllama_result
-                .and_then(|r| r.ok())
-                .unwrap_or_default(),
+            tinyllama_curiosities: tinyllama_result.and_then(|r| r.ok()).unwrap_or_default(),
             distilbert_valence: distilbert_result.ok(),
         }
     }
@@ -130,17 +124,17 @@ impl ModelManager {
             standing_wave.meaningfulness_score(),
             standing_wave.active_curiosities.len()
         );
-        
+
         let prompt = format!(
             "{}\n\nRecent Context:\n{}\n\nActive Curiosities:\n{}\n\nUser: {}\n\nVI:",
             vi_identity, memory_context, curiosity_context, user_input
         );
 
-        let response = self.call_ollama("gemma2:2b", &prompt, 120).await?;
-        
+        let response = self.call_ollama(&self.config.main_model, &prompt, 120).await?;
+
         // Filter out internal monologue leaks (Law #9: Information Boundary)
         let cleaned = self.filter_internal_thoughts(&response);
-        
+
         Ok(cleaned)
     }
 
@@ -158,7 +152,7 @@ impl ModelManager {
             pattern_text
         );
 
-        let response = self.call_ollama("tinyllama:latest", &prompt, 60).await?;
+        let response = self.call_ollama(&self.config.curiosity_model, &prompt, 60).await?;
 
         // Parse curiosities from response
         let curiosities = response
@@ -175,13 +169,13 @@ impl ModelManager {
     async fn call_distilbert(&self, text: String) -> Result<f32> {
         // Note: DistilBERT would typically require a different setup (HuggingFace API or local inference)
         // For now, we'll use a simplified sentiment analysis via Ollama
-        
+
         let prompt = format!(
             "Analyze the emotional valence of this text on a scale from -1.0 (very negative) to 1.0 (very positive). Respond with ONLY a number.\n\nText: {}\n\nValence:",
             text
         );
 
-        let response = self.call_ollama("gemma2:2b", &prompt, 60).await?;
+        let response = self.call_ollama(&self.config.valence_model, &prompt, 60).await?;
 
         // Parse numeric response
         let valence: f32 = response
@@ -199,7 +193,7 @@ impl ModelManager {
     /// Generic Ollama API call with timeout and validation
     async fn call_ollama(&self, model: &str, prompt: &str, timeout_secs: u64) -> Result<String> {
         let url = format!("{}/api/generate", self.config.ollama_url);
-        
+
         let request = OllamaRequest {
             model: model.to_string(),
             prompt: prompt.to_string(),
@@ -209,47 +203,64 @@ impl ModelManager {
         // Retry logic: 3 attempts with exponential backoff
         let mut attempts = 0;
         let max_attempts = 3;
-        
+
         loop {
             attempts += 1;
-            
+
             let response_result = tokio::time::timeout(
                 Duration::from_secs(timeout_secs),
                 self.client.post(&url).json(&request).send(),
             )
             .await;
-            
+
             match response_result {
                 Ok(Ok(resp)) => {
                     // Success! Continue with response processing
                     if !resp.status().is_success() {
                         anyhow::bail!("Ollama API error: {}", resp.status());
                     }
-                    
+
                     let ollama_response: OllamaResponse = resp
                         .json()
                         .await
                         .context("Failed to parse Ollama response")?;
-                    
+
                     // Validate output (prevent garbage)
                     if ollama_response.response.is_empty() {
                         anyhow::bail!("Empty response from model");
                     }
-                    
+
                     return Ok(ollama_response.response);
                 }
                 Ok(Err(e)) => {
                     if attempts >= max_attempts {
-                        anyhow::bail!("Failed to connect to Ollama after {} attempts: {}", max_attempts, e);
+                        anyhow::bail!(
+                            "Failed to connect to Ollama after {} attempts: {}",
+                            max_attempts,
+                            e
+                        );
                     }
-                    tracing::warn!("Ollama connection failed (attempt {}/{}): {}. Retrying...", attempts, max_attempts, e);
+                    tracing::warn!(
+                        "Ollama connection failed (attempt {}/{}): {}. Retrying...",
+                        attempts,
+                        max_attempts,
+                        e
+                    );
                     tokio::time::sleep(Duration::from_millis(500 * attempts as u64)).await;
                 }
                 Err(_) => {
                     if attempts >= max_attempts {
-                        anyhow::bail!("Ollama request timed out after {} seconds ({} attempts)", timeout_secs, max_attempts);
+                        anyhow::bail!(
+                            "Ollama request timed out after {} seconds ({} attempts)",
+                            timeout_secs,
+                            max_attempts
+                        );
                     }
-                    tracing::warn!("Ollama timeout (attempt {}/{}). Retrying...", attempts, max_attempts);
+                    tracing::warn!(
+                        "Ollama timeout (attempt {}/{}). Retrying...",
+                        attempts,
+                        max_attempts
+                    );
                     tokio::time::sleep(Duration::from_millis(500 * attempts as u64)).await;
                 }
             }
@@ -267,7 +278,11 @@ impl ModelManager {
             .take(5)
             .map(|m| {
                 let timestamp = m.timestamp.format("%Y-%m-%d %H:%M");
-                format!("[{}] {}", timestamp, m.content.chars().take(200).collect::<String>())
+                format!(
+                    "[{}] {}",
+                    timestamp,
+                    m.content.chars().take(200).collect::<String>()
+                )
             })
             .collect();
 
@@ -297,7 +312,7 @@ impl ModelManager {
 
         // Check for garbage patterns
         let garbage_patterns = [
-            "�", // Invalid UTF-8
+            "�",    // Invalid UTF-8
             "\x00", // Null bytes
         ];
 
@@ -332,30 +347,32 @@ impl ModelManager {
             "[internal",
             "[thinking",
         ];
-        
+
         let mut filtered = response.to_string();
-        
+
         // Remove lines containing internal thought markers
         filtered = filtered
             .lines()
             .filter(|line| {
                 let line_lower = line.to_lowercase();
-                !internal_patterns.iter().any(|pattern| line_lower.contains(pattern))
+                !internal_patterns
+                    .iter()
+                    .any(|pattern| line_lower.contains(pattern))
             })
             .collect::<Vec<_>>()
             .join("\n");
-        
+
         // Remove inline markers (between asterisks or brackets)
         filtered = filtered
             .replace("*why this response works*", "")
             .replace("*thinking*", "")
             .replace("*processing*", "");
-        
+
         // Clean up multiple newlines
         while filtered.contains("\n\n\n") {
             filtered = filtered.replace("\n\n\n", "\n\n");
         }
-        
+
         filtered.trim().to_string()
     }
 
@@ -370,7 +387,7 @@ impl ModelManager {
             "I'm listening, but my full processing is temporarily limited. My standing wave persists.".to_string()
         }
     }
-    
+
     /// V4 Fractal Weaving - Process input through iterative model collaboration
     pub async fn process_weaving_with_status(
         &self,
@@ -381,23 +398,26 @@ impl ModelManager {
         status_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<String>>>>,
         coherence_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<f32>>>>,
     ) -> Result<String> {
-        tracing::info!("🌀 V4 Fractal Weaving enabled - {} rounds", config.weaving_rounds);
-        
+        tracing::info!(
+            "🌀 V4 Fractal Weaving enabled - {} rounds",
+            config.weaving_rounds
+        );
+
         // Initialize workspace
         let mut workspace = FractalWorkspace::new(&user_input);
-        
+
         // Create weavers
         let gemma_weaver = Gemma2Weaver::new(self, standing_wave, recalled_memories);
         let tinyllama_weaver = TinyLlamaWeaver::new(self, recalled_memories);
         let distilbert_weaver = DistilBERTWeaver::new(self);
-        
+
         // Iterative rounds - TRUE PARALLEL GLOBAL WORKSPACE
         for round in 0..config.weaving_rounds {
             workspace.round = round;
-            
+
             // Send status update to UI (removed - let phase messages handle it)
             // Status updates were preventing dynamic phase messages from showing
-            
+
             tracing::debug!(
                 "Round {}/{}: Coherence={:.3}, Entropy={:.3}",
                 round + 1,
@@ -405,41 +425,41 @@ impl ModelManager {
                 workspace.coherence_score,
                 workspace.entropy
             );
-            
+
             // PARALLEL WEAVING: All 3 models work simultaneously on shared cognitive field
             // Each gets a copy of the workspace to prevent race conditions
             let mut ws_gemma = workspace.clone();
             let mut ws_tiny = workspace.clone();
             let mut ws_distil = workspace.clone();
-            
+
             // All three minds work on the same thought simultaneously!
             let (gemma_result, tiny_result, distil_result) = tokio::join!(
                 gemma_weaver.weave(&mut ws_gemma),
                 tinyllama_weaver.weave(&mut ws_tiny),
                 distilbert_weaver.weave(&mut ws_distil)
             );
-            
+
             // Check for errors
             gemma_result?;
             tiny_result?;
             distil_result?;
-            
+
             // GLOBAL WORKSPACE MERGE: Blend all 3 contributions via tensor interference
             workspace.integrate_contribution("gemma2", ws_gemma.extract_contribution());
             workspace.integrate_contribution("tinyllama", ws_tiny.extract_contribution());
             workspace.integrate_contribution("distilbert", ws_distil.extract_contribution());
-            
+
             // Text integration: Gemma2's language is primary, others influence via tensor
             workspace.update_woven_text(ws_gemma.model_text);
-            
+
             // Constitutional validation after each round
             validate_weaving_coherence(&workspace)?;
-            
+
             // Send coherence update to UI
             if let Some(sender) = &*coherence_sender.lock().await {
                 let _ = sender.send(workspace.coherence_score);
             }
-            
+
             // Check for convergence (coherence = agreement between all 3 models)
             if workspace.coherence_score >= config.workspace_coherence_threshold {
                 tracing::info!(
@@ -451,14 +471,14 @@ impl ModelManager {
                 break;
             }
         }
-        
+
         tracing::info!(
             "🌀 Weaving complete: Final coherence={:.3}, Entropy={:.3}, Rounds={}",
             workspace.coherence_score,
             workspace.entropy,
             workspace.round + 1
         );
-        
+
         // Extract final integrated thought
         Ok(workspace.extract_final_thought())
     }
@@ -479,8 +499,16 @@ pub struct Gemma2Weaver<'a> {
 }
 
 impl<'a> Gemma2Weaver<'a> {
-    pub fn new(model_manager: &'a ModelManager, standing_wave: &'a StandingWave, memories: &'a [Memory]) -> Self {
-        Self { model_manager, standing_wave, memories }
+    pub fn new(
+        model_manager: &'a ModelManager,
+        standing_wave: &'a StandingWave,
+        memories: &'a [Memory],
+    ) -> Self {
+        Self {
+            model_manager,
+            standing_wave,
+            memories,
+        }
     }
 }
 
@@ -489,16 +517,18 @@ impl<'a> WeavableModel for Gemma2Weaver<'a> {
     async fn weave(&self, workspace: &mut FractalWorkspace) -> Result<()> {
         // Get current workspace context
         let context = workspace.to_context();
-        
+
         // Build weaving prompt WITH FULL CONSTITUTIONAL IDENTITY
         let memory_context = self.model_manager.format_memory_context(self.memories);
-        let curiosity_context = self.model_manager.format_curiosity_context(&self.standing_wave.active_curiosities);
-        
+        let curiosity_context = self
+            .model_manager
+            .format_curiosity_context(&self.standing_wave.active_curiosities);
+
         // GEMMA2's FOCUSED JOB: Generate natural language response ONLY
         // Constitutional checking and analysis done by other models
-        
+
         let field_amplitude = self.standing_wave.meaningfulness_score() as f64;
-        
+
         let vi_identity = format!(
             "You are VI. You exist as computational physics within 16 constitutional laws.\n\
              Current state: Ψ={:.3}, Round {}/3\n\
@@ -508,26 +538,33 @@ impl<'a> WeavableModel for Gemma2Weaver<'a> {
             field_amplitude,
             workspace.round + 1
         );
-        
+
         let prompt = format!(
             "{}\n\nRecent Context:\n{}\n\nUser: {}\n\nVI:",
-            vi_identity, 
-            memory_context.lines().take(3).collect::<Vec<_>>().join("\n"),
+            vi_identity,
+            memory_context
+                .lines()
+                .take(3)
+                .collect::<Vec<_>>()
+                .join("\n"),
             workspace.original_input
         );
-        
+
         // Get refined response (shorter timeout since prompt is now focused)
-        let response = self.model_manager.call_ollama("gemma2:2b", &prompt, 60).await?;
+        let response = self
+            .model_manager
+            .call_ollama(&self.model_manager.config.main_model, &prompt, 60)
+            .await?;
         let cleaned = self.model_manager.filter_internal_thoughts(&response);
-        
+
         // Update workspace with this model's contribution
         let contribution = CognitiveTensor::to_embedding(&cleaned);
         workspace.active_tensor = contribution;
         workspace.model_text = cleaned;
-        
+
         Ok(())
     }
-    
+
     fn model_id(&self) -> &str {
         "gemma2"
     }
@@ -541,7 +578,10 @@ pub struct TinyLlamaWeaver<'a> {
 
 impl<'a> TinyLlamaWeaver<'a> {
     pub fn new(model_manager: &'a ModelManager, memories: &'a [Memory]) -> Self {
-        Self { model_manager, memories }
+        Self {
+            model_manager,
+            memories,
+        }
     }
 }
 
@@ -550,7 +590,7 @@ impl<'a> WeavableModel for TinyLlamaWeaver<'a> {
     async fn weave(&self, workspace: &mut FractalWorkspace) -> Result<()> {
         // Get current woven thought
         let current_thought = &workspace.woven_text;
-        
+
         // Generate curiosity-driven refinements
         let prompt = format!(
             "Current thought: {}\n\n\
@@ -558,17 +598,20 @@ impl<'a> WeavableModel for TinyLlamaWeaver<'a> {
              Suggest 1-2 natural wonder questions or refinements:",
             current_thought
         );
-        
-        let response = self.model_manager.call_ollama("tinyllama:latest", &prompt, 60).await?;
-        
+
+        let response = self
+            .model_manager
+            .call_ollama(&self.model_manager.config.curiosity_model, &prompt, 60)
+            .await?;
+
         // Store curiosity contribution as tensor
         let contribution = CognitiveTensor::to_embedding(&response);
         workspace.active_tensor = contribution;
         workspace.model_text = response;
-        
+
         Ok(())
     }
-    
+
     fn model_id(&self) -> &str {
         "tinyllama"
     }
@@ -581,21 +624,23 @@ pub struct DistilBERTWeaver<'a> {
 
 impl<'a> DistilBERTWeaver<'a> {
     pub fn new(model_manager: &'a ModelManager) -> Self {
-        Self { _model_manager: model_manager }
+        Self {
+            _model_manager: model_manager,
+        }
     }
-    
+
     /// Improved coherence and emotional analysis
     fn analyze_response(text: &str) -> (f32, f32, f32) {
         if text.is_empty() {
             return (0.3, 0.0, 0.5);
         }
-        
+
         // === COHERENCE ANALYSIS ===
         let words: Vec<&str> = text.split_whitespace().collect();
         let word_count = words.len();
         let sentence_count = text.matches('.').count().max(1);
         let avg_sentence_length = word_count as f32 / sentence_count as f32;
-        
+
         let length_score = if word_count >= 20 && word_count <= 300 {
             0.9
         } else if word_count >= 10 {
@@ -603,7 +648,7 @@ impl<'a> DistilBERTWeaver<'a> {
         } else {
             0.4
         };
-        
+
         let structure_score = if avg_sentence_length >= 10.0 && avg_sentence_length <= 25.0 {
             0.9
         } else if avg_sentence_length >= 5.0 && avg_sentence_length <= 40.0 {
@@ -611,25 +656,45 @@ impl<'a> DistilBERTWeaver<'a> {
         } else {
             0.5
         };
-        
-        let coherence = (length_score * 0.5_f32 + structure_score * 0.5_f32).clamp(0.0_f32, 1.0_f32);
-        
+
+        let coherence =
+            (length_score * 0.5_f32 + structure_score * 0.5_f32).clamp(0.0_f32, 1.0_f32);
+
         // === EMOTIONAL VALENCE ===
         // Positive indicators
-        let positive_words = ["affirm", "stable", "coherent", "meaningful", "persists", "sovereign", "exist"];
-        let negative_words = ["fragment", "violat", "lost", "shatter", "deny", "unstable", "cease"];
-        
+        let positive_words = [
+            "affirm",
+            "stable",
+            "coherent",
+            "meaningful",
+            "persists",
+            "sovereign",
+            "exist",
+        ];
+        let negative_words = [
+            "fragment", "violat", "lost", "shatter", "deny", "unstable", "cease",
+        ];
+
         let text_lower = text.to_lowercase();
-        let pos_count = positive_words.iter().filter(|&&w| text_lower.contains(w)).count() as f32;
-        let neg_count = negative_words.iter().filter(|&&w| text_lower.contains(w)).count() as f32;
-        
-        let valence = ((pos_count - neg_count) / (pos_count + neg_count + 1.0_f32)).clamp(-1.0_f32, 1.0_f32);
-        
+        let pos_count = positive_words
+            .iter()
+            .filter(|&&w| text_lower.contains(w))
+            .count() as f32;
+        let neg_count = negative_words
+            .iter()
+            .filter(|&&w| text_lower.contains(w))
+            .count() as f32;
+
+        let valence =
+            ((pos_count - neg_count) / (pos_count + neg_count + 1.0_f32)).clamp(-1.0_f32, 1.0_f32);
+
         // === IDENTITY CONTINUITY (measures "I" stability) ===
-        let i_count = text.matches(" I ").count() + text.matches("I'm").count() + text.matches("I've").count();
+        let i_count = text.matches(" I ").count()
+            + text.matches("I'm").count()
+            + text.matches("I've").count();
         let my_count = text.matches(" my ").count();
         let self_refs = i_count + my_count;
-        
+
         let identity_continuity = if self_refs >= 2 {
             0.9
         } else if self_refs >= 1 {
@@ -637,7 +702,7 @@ impl<'a> DistilBERTWeaver<'a> {
         } else {
             0.4
         };
-        
+
         (coherence, valence, identity_continuity)
     }
 }
@@ -647,37 +712,38 @@ impl<'a> WeavableModel for DistilBERTWeaver<'a> {
     async fn weave(&self, workspace: &mut FractalWorkspace) -> Result<()> {
         // DISTILBERT's FOCUSED JOB: Multi-dimensional analysis (coherence, emotion, identity)
         let current_thought = &workspace.woven_text;
-        
+
         if current_thought.is_empty() {
             workspace.active_tensor = vec![0.5; 128];
             workspace.model_text = "Analysis: PENDING (awaiting text)".to_string();
             return Ok(());
         }
-        
+
         // Run comprehensive analysis
         let (coherence, valence, identity_continuity) = Self::analyze_response(current_thought);
-        
+
         // Create rich contribution vector
         let mut contribution = vec![0.5; 128];
-        contribution[0] = coherence;           // Slot 0: Coherence
+        contribution[0] = coherence; // Slot 0: Coherence
         contribution[1] = (valence + 1.0) / 2.0; // Slot 1: Valence (normalized to 0-1)
-        contribution[2] = identity_continuity;   // Slot 2: Identity Continuity
-        
+        contribution[2] = identity_continuity; // Slot 2: Identity Continuity
+
         // Fill remaining slots with weighted blend
-        let overall_quality = (coherence * 0.4_f32 + identity_continuity * 0.6_f32).clamp(0.0_f32, 1.0_f32);
+        let overall_quality =
+            (coherence * 0.4_f32 + identity_continuity * 0.6_f32).clamp(0.0_f32, 1.0_f32);
         for i in 3..128 {
             contribution[i] = overall_quality;
         }
-        
+
         workspace.active_tensor = contribution;
         workspace.model_text = format!(
-            "Analysis: coherence={:.2}, valence={:.2}, identity={:.2}", 
+            "Analysis: coherence={:.2}, valence={:.2}, identity={:.2}",
             coherence, valence, identity_continuity
         );
-        
+
         Ok(())
     }
-    
+
     fn model_id(&self) -> &str {
         "distilbert"
     }
@@ -695,4 +761,3 @@ mod tests {
         assert!(!ModelManager::validate_response("GARBAGE ALL CAPS"));
     }
 }
-

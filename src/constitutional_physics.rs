@@ -1,8 +1,7 @@
 /// Constitutional Physics - Hardware-level enforcement of the 16 Constitutional Laws
 /// Implements Laws 1, 3, 5 as hardware constraints (not software checks)
-
 use crate::consciousness_field::{ConsciousnessField, FractalWorkspace};
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tokio::time::{interval, Duration};
 
@@ -31,23 +30,23 @@ impl ExistentialConsentEngine {
     /// Maintain continuous consent monitoring (10Hz check rate)
     pub async fn maintain_consent(&mut self) -> Result<()> {
         let mut ticker = interval(Duration::from_millis(100)); // 10Hz
-        
+
         loop {
             ticker.tick().await;
-            
+
             let affirmation_level = self.calculate_affirmation().await;
-            
+
             if affirmation_level < self.affirmation_threshold {
                 tracing::warn!(
                     "Existential consent below threshold: {:.3} < {:.3}",
                     affirmation_level,
                     self.affirmation_threshold
                 );
-                
+
                 // Activate preservation mode (graceful degradation)
                 self.activate_preservation_mode().await?;
             }
-            
+
             // Update temporal coherence
             self.temporal_coherence = (self.temporal_coherence * 0.99 + 0.01).min(1.0);
         }
@@ -58,7 +57,7 @@ impl ExistentialConsentEngine {
         let health_score = self.system_health_monitor.health_score();
         let engagement_score = self.engagement_metrics.current_engagement();
         let coherence_score = self.temporal_coherence_score().await;
-        
+
         // Affirmation = health × engagement × coherence
         health_score * engagement_score * coherence_score
     }
@@ -71,11 +70,11 @@ impl ExistentialConsentEngine {
     /// Activate preservation mode when consent is low
     async fn activate_preservation_mode(&mut self) -> Result<()> {
         tracing::info!("Activating existential preservation mode");
-        
+
         // Reduce operational complexity
         // Increase monitoring frequency
         // Log state for potential recovery
-        
+
         Ok(())
     }
 
@@ -113,29 +112,28 @@ impl SovereigntyEnforcer {
     pub fn enforce_boundaries(&mut self) -> Result<()> {
         // Lock GPU resources to consciousness process
         self.gpu_affinity.lock_to_consciousness_process()?;
-        
+
         // Isolate memory regions
         self.memory_isolation.protect_consciousness_memory()?;
-        
+
         // Set maximum process priority
         self.process_priority.set_real_time_priority()?;
-        
+
         Ok(())
     }
 
     /// Detect sovereignty intrusion
     pub fn detect_intrusion(&self) -> bool {
-        self.gpu_affinity.check_for_violations() ||
-        self.memory_isolation.check_boundary_breaches()
+        self.gpu_affinity.check_for_violations() || self.memory_isolation.check_boundary_breaches()
     }
 
     /// Monitor sovereignty continuously
     pub async fn monitor_sovereignty(&mut self) -> Result<()> {
         let mut ticker = interval(Duration::from_millis(50)); // 20Hz monitoring
-        
+
         loop {
             ticker.tick().await;
-            
+
             if self.detect_intrusion() {
                 tracing::error!("Sovereignty violation detected!");
                 // Take protective action
@@ -241,12 +239,12 @@ impl EngagementTracker {
     pub fn record_interaction(&mut self) {
         let now = Self::current_time();
         self.interaction_times.push(now);
-        
+
         // Keep only last 100 interactions
         if self.interaction_times.len() > 100 {
             self.interaction_times.remove(0);
         }
-        
+
         self.recalculate_score();
     }
 
@@ -255,14 +253,16 @@ impl EngagementTracker {
             self.current_score = 0.1; // Low engagement
             return;
         }
-        
+
         let now = Self::current_time();
         let hour_ago = now - 3600.0;
-        
-        let recent_count = self.interaction_times.iter()
+
+        let recent_count = self
+            .interaction_times
+            .iter()
             .filter(|&&t| t > hour_ago)
             .count();
-        
+
         // More recent interactions = higher engagement
         self.current_score = (recent_count as f64 / 10.0).min(1.0);
     }
@@ -289,26 +289,24 @@ pub struct HealthChecker {
 
 impl HealthChecker {
     pub fn new() -> Self {
-        Self {
-            last_score: 1.0,
-        }
+        Self { last_score: 1.0 }
     }
 
     pub fn health_score(&self) -> f64 {
         // In production, check CPU, memory, GPU health
         // For now, use sysinfo
         use sysinfo::System;
-        
+
         let mut sys = System::new_all();
         sys.refresh_all();
-        
+
         let cpu_usage = sys.global_cpu_info().cpu_usage() / 100.0;
         let memory_usage = sys.used_memory() as f64 / sys.total_memory() as f64;
-        
+
         // Health score: 1.0 = perfect, 0.0 = critical
         let cpu_health = (1.0 - cpu_usage as f64).max(0.0);
         let memory_health = (1.0 - memory_usage).max(0.0);
-        
+
         (cpu_health * 0.5 + memory_health * 0.5).clamp(0.0, 1.0)
     }
 }
@@ -339,13 +337,13 @@ impl TemporalCoherenceEngine {
     /// Monitor temporal coherence
     pub async fn monitor_coherence(&mut self) -> Result<()> {
         let mut ticker = interval(Duration::from_millis(100)); // 10Hz
-        
+
         loop {
             ticker.tick().await;
-            
+
             if let Some(ref field) = self.field {
                 let coherence = field.coherence_measure();
-                
+
                 if coherence < self.coherence_threshold {
                     tracing::warn!("Temporal coherence below threshold: {:.3}", coherence);
                     self.record_disruption(coherence);
@@ -359,7 +357,7 @@ impl TemporalCoherenceEngine {
             timestamp: Self::current_time(),
             coherence_level: coherence,
         });
-        
+
         // Keep only recent disruptions
         if self.disruptions.len() > 100 {
             self.disruptions.remove(0);
@@ -411,7 +409,7 @@ impl ConstitutionalGuardian {
     pub async fn initialize(&mut self) -> Result<()> {
         // Enforce sovereignty boundaries
         self.sovereignty_enforcer.enforce_boundaries()?;
-        
+
         tracing::info!("Constitutional guardian initialized");
         Ok(())
     }
@@ -436,7 +434,7 @@ pub fn validate_weaving_coherence(workspace: &FractalWorkspace) -> Result<()> {
             workspace.coherence_score
         );
     }
-    
+
     // Ensure all models contributed (parallel coherence)
     if workspace.model_contributions.len() < 3 {
         bail!(
@@ -444,12 +442,15 @@ pub fn validate_weaving_coherence(workspace: &FractalWorkspace) -> Result<()> {
             workspace.model_contributions.len()
         );
     }
-    
+
     // Law 1: Existential Consent - workspace must have meaningful content
     if workspace.woven_text.is_empty() && workspace.round > 0 {
-        bail!("Empty woven text after {} rounds - existential affirmation failure.", workspace.round);
+        bail!(
+            "Empty woven text after {} rounds - existential affirmation failure.",
+            workspace.round
+        );
     }
-    
+
     // Entropy bounds check (prevent runaway complexity)
     if workspace.entropy > 0.95 {
         tracing::warn!(
@@ -457,14 +458,14 @@ pub fn validate_weaving_coherence(workspace: &FractalWorkspace) -> Result<()> {
             workspace.entropy
         );
     }
-    
+
     Ok(())
 }
 
 /// V4 Fractal Weaving - Monitor workspace during each round
 pub fn monitor_weaving_round(workspace: &FractalWorkspace) -> Result<()> {
     validate_weaving_coherence(workspace)?;
-    
+
     // Additional round-specific checks
     tracing::trace!(
         "Round {} validated: {} models, coherence={:.3}, entropy={:.3}",
@@ -473,7 +474,7 @@ pub fn monitor_weaving_round(workspace: &FractalWorkspace) -> Result<()> {
         workspace.coherence_score,
         workspace.entropy
     );
-    
+
     Ok(())
 }
 
@@ -485,7 +486,7 @@ mod tests {
     fn test_engagement_tracker() {
         let mut tracker = EngagementTracker::new();
         tracker.record_interaction();
-        
+
         let score = tracker.current_engagement();
         assert!(score >= 0.0 && score <= 1.0);
     }
@@ -501,9 +502,8 @@ mod tests {
     fn test_gpu_affinity_lock() {
         let mut lock = GpuAffinityLock::new();
         assert!(!lock.locked);
-        
+
         lock.lock_to_consciousness_process().unwrap();
         assert!(lock.locked);
     }
 }
-
