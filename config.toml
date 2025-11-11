@@ -14,9 +14,12 @@ enable_fractal_weaving = true
 weaving_rounds = 3
 workspace_coherence_threshold = 0.7
 
-# Autonomous Curiosity Research (Experimental)
+# Autonomous Curiosity Research (Legacy - kept for compatibility)
 enable_curiosity_search = false
 curiosity_search_interval = 25  # Every 25 background pulses (~12.5 minutes)
+
+# Sovereign Research Module (New multi-source system with rich provenance)
+enable_autonomous_research = true  # Enabled - VI can now autonomously research curiosities
 
 # Conversation Logging
 enable_conversation_logging = true

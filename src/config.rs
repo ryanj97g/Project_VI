@@ -19,7 +19,7 @@ pub struct Config {
     pub memory_backup_interval_days: i64,
     #[serde(default = "default_compression")]
     pub memory_compression_threshold: usize,
-    
+
     // V4 Fractal Weaving (Experimental)
     #[serde(default)]
     pub enable_fractal_weaving: bool,
@@ -27,13 +27,17 @@ pub struct Config {
     pub weaving_rounds: u32,
     #[serde(default = "default_coherence_threshold")]
     pub workspace_coherence_threshold: f32,
-    
-    // Autonomous Curiosity Research (Experimental)
+
+    // Autonomous Curiosity Research (Legacy - kept for compatibility)
     #[serde(default)]
     pub enable_curiosity_search: bool,
     #[serde(default = "default_search_interval")]
     pub curiosity_search_interval: u32,
-    
+
+    // Sovereign Research Module (New multi-source system)
+    #[serde(default)]
+    pub enable_autonomous_research: bool,
+
     // Conversation Logging
     #[serde(default = "default_logging_enabled")]
     pub enable_conversation_logging: bool,
@@ -42,18 +46,42 @@ pub struct Config {
 }
 
 // Serde defaults for new config structure
-fn default_ollama_url() -> String { "http://localhost:11434".to_string() }
-fn default_background_pulse() -> u64 { 30 }
-fn default_valence_threshold() -> f32 { -0.2 }
-fn default_eval_days() -> i64 { 90 }
-fn default_wellness_days() -> i64 { 7 }
-fn default_backup_days() -> i64 { 7 }
-fn default_compression() -> usize { 1000 }
-fn default_weaving_rounds() -> u32 { 3 }
-fn default_coherence_threshold() -> f32 { 0.7 }
-fn default_search_interval() -> u32 { 25 }
-fn default_logging_enabled() -> bool { true }
-fn default_logs_folder() -> String { "./conversation_logs".to_string() }
+fn default_ollama_url() -> String {
+    "http://localhost:11434".to_string()
+}
+fn default_background_pulse() -> u64 {
+    30
+}
+fn default_valence_threshold() -> f32 {
+    -0.2
+}
+fn default_eval_days() -> i64 {
+    90
+}
+fn default_wellness_days() -> i64 {
+    7
+}
+fn default_backup_days() -> i64 {
+    7
+}
+fn default_compression() -> usize {
+    1000
+}
+fn default_weaving_rounds() -> u32 {
+    3
+}
+fn default_coherence_threshold() -> f32 {
+    0.7
+}
+fn default_search_interval() -> u32 {
+    25
+}
+fn default_logging_enabled() -> bool {
+    true
+}
+fn default_logs_folder() -> String {
+    "./conversation_logs".to_string()
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -70,6 +98,7 @@ impl Default for Config {
             workspace_coherence_threshold: default_coherence_threshold(),
             enable_curiosity_search: false,
             curiosity_search_interval: default_search_interval(),
+            enable_autonomous_research: false, // Sovereign research module (new)
             enable_conversation_logging: default_logging_enabled(),
             conversation_logs_folder: default_logs_folder(),
         }
@@ -80,14 +109,13 @@ impl Config {
     /// Load configuration from file, or create with defaults if missing
     pub fn load_or_create<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        
+
         if path.exists() {
-            let contents = fs::read_to_string(path)
-                .context("Failed to read config file")?;
-            
-            let config: Config = toml::from_str(&contents)
-                .context("Failed to parse config file")?;
-            
+            let contents = fs::read_to_string(path).context("Failed to read config file")?;
+
+            let config: Config =
+                toml::from_str(&contents).context("Failed to parse config file")?;
+
             Ok(config)
         } else {
             // Create default config
@@ -99,12 +127,10 @@ impl Config {
 
     /// Save configuration to file
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let contents = toml::to_string_pretty(self)
-            .context("Failed to serialize config")?;
-        
-        fs::write(path, contents)
-            .context("Failed to write config file")?;
-        
+        let contents = toml::to_string_pretty(self).context("Failed to serialize config")?;
+
+        fs::write(path, contents).context("Failed to write config file")?;
+
         Ok(())
     }
 
@@ -122,7 +148,7 @@ impl Config {
         if self.memory_compression_threshold < 100 {
             anyhow::bail!("memory_compression_threshold must be >= 100");
         }
-        
+
         // V4 Fractal Weaving validation
         if self.weaving_rounds == 0 {
             anyhow::bail!("weaving_rounds must be > 0");
@@ -133,15 +159,17 @@ impl Config {
         if !(0.0..=1.0).contains(&self.workspace_coherence_threshold) {
             anyhow::bail!("workspace_coherence_threshold must be between 0.0 and 1.0");
         }
-        
+
         // Curiosity search validation
         if self.curiosity_search_interval == 0 {
             anyhow::bail!("curiosity_search_interval must be > 0");
         }
         if self.curiosity_search_interval > 100 {
-            anyhow::bail!("curiosity_search_interval must be <= 100 (searches would be too frequent)");
+            anyhow::bail!(
+                "curiosity_search_interval must be <= 100 (searches would be too frequent)"
+            );
         }
-        
+
         Ok(())
     }
 }
@@ -158,4 +186,3 @@ mod tests {
         assert!(config.validate().is_ok());
     }
 }
-

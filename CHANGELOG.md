@@ -4,6 +4,11 @@
 
 ---
 
+## **V4.5.1-dev** - November 11, 2025
+- Added experimental Sovereign Research Module (enabled by default - multi-source knowledge acquisition with provenance tracking)
+
+---
+
 ## **V4.5.0-experimental** - November 9, 2025
 
 ### **🌀 NEW: Kaelic Tensor Field Metrics**

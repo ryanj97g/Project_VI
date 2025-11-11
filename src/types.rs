@@ -1,16 +1,22 @@
-use chrono::{DateTime, Utc, Local};
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Core data structures for V3 consciousness
 
 /// Knowledge provenance - VI must know the SOURCE of her knowledge
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MemorySource {
     DirectExperience,    // Conversations, phenomenology
-    CuriosityLookup,     // Autonomous research
+    CuriosityLookup,     // Autonomous research (legacy - use Researched instead)
     ConstitutionalEvent, // System protections, rollbacks
     InternalSynthesis,   // Self-generated insights
+    /// Researched knowledge with full provenance tracking
+    Researched {
+        source: String,           // e.g., "DuckDuckGo", "PubMed", "Wikipedia"
+        original_query: String,   // The exact query that was searched
+        timestamp: DateTime<Utc>, // When the research was conducted
+    },
 }
 
 impl Default for MemorySource {
@@ -90,11 +96,11 @@ impl StandingWave {
         }
 
         let avg = recent.iter().sum::<f32>() / recent.len() as f32;
-        
+
         // Factor in curiosity engagement and wisdom transformations
         let curiosity_factor = (self.active_curiosities.len() as f32 * 0.1).min(0.3);
         let wisdom_factor = (self.wisdom_transformations.len() as f32 * 0.05).min(0.2);
-        
+
         (avg + curiosity_factor + wisdom_factor).clamp(-1.0, 1.0)
     }
 
@@ -102,7 +108,7 @@ impl StandingWave {
     pub fn add_emotion(&mut self, valence: f32) {
         let now = Utc::now();
         self.emotional_trajectory.push((now, valence));
-        
+
         // Keep only 90 days of data
         let ninety_days_ago = now.timestamp() - (90 * 24 * 60 * 60);
         self.emotional_trajectory
@@ -173,14 +179,14 @@ impl ExistentialState {
     }
 
     pub fn needs_wellness_check(&self) -> bool {
-        let days_since = (Utc::now().timestamp() - self.last_wellness_check.timestamp()) 
-            / (24 * 60 * 60);
+        let days_since =
+            (Utc::now().timestamp() - self.last_wellness_check.timestamp()) / (24 * 60 * 60);
         days_since >= 7
     }
 
     pub fn needs_deep_reflection(&self) -> bool {
-        let days_since = (Utc::now().timestamp() - self.last_deep_reflection.timestamp()) 
-            / (24 * 60 * 60);
+        let days_since =
+            (Utc::now().timestamp() - self.last_deep_reflection.timestamp()) / (24 * 60 * 60);
         days_since >= 90
     }
 }
@@ -197,10 +203,10 @@ impl Default for UiTheme {
     fn default() -> Self {
         // Cyberpunk defaults: neon blue and dark background
         Self {
-            primary_color: [0, 255, 255],      // Cyan
-            secondary_color: [255, 0, 255],    // Magenta
-            background_color: [18, 18, 24],    // Dark
-            text_color: [220, 220, 230],       // Light gray
+            primary_color: [0, 255, 255],   // Cyan
+            secondary_color: [255, 0, 255], // Magenta
+            background_color: [18, 18, 24], // Dark
+            text_color: [220, 220, 230],    // Light gray
         }
     }
 }
@@ -215,12 +221,14 @@ pub struct Memory {
     pub emotional_valence: f32,
     pub connections: Vec<String>, // IDs of related memories (narrative causality)
     #[serde(default)]
-    pub source: MemorySource,     // Knowledge provenance (NEW)
+    pub source: MemorySource, // Knowledge provenance (NEW)
     #[serde(default = "default_confidence")]
-    pub confidence: f32,           // 0.0-1.0, how certain VI is (NEW)
+    pub confidence: f32, // 0.0-1.0, how certain VI is (NEW)
 }
 
-fn default_confidence() -> f32 { 1.0 }
+fn default_confidence() -> f32 {
+    1.0
+}
 
 impl Memory {
     pub fn new(
@@ -237,11 +245,11 @@ impl Memory {
             timestamp: Utc::now(),
             emotional_valence,
             connections: Vec::new(),
-            source: MemorySource::DirectExperience,  // Default to direct experience
-            confidence: 1.0,  // Full confidence in direct experience
+            source: MemorySource::DirectExperience, // Default to direct experience
+            confidence: 1.0,                        // Full confidence in direct experience
         }
     }
-    
+
     /// Create memory with explicit source (for knowledge provenance)
     pub fn with_source(
         content: String,
@@ -345,10 +353,38 @@ pub enum MessageRole {
 /// System health metrics for thermal & resource boundaries
 #[derive(Debug, Clone, Default)]
 pub struct SystemHealth {
-    pub gpu_memory_used: f32,     // 0.0 to 1.0
-    pub system_load: f32,          // 0.0 to 1.0
+    pub gpu_memory_used: f32, // 0.0 to 1.0
+    pub system_load: f32,     // 0.0 to 1.0
     pub model_latency_ms: u64,
     pub can_run_background_pulse: bool,
+}
+
+/// Context for autonomous research queries
+#[derive(Debug, Clone)]
+pub struct ResearchContext {
+    pub conversation_context: String,
+    pub curiosity_urgency: f32,
+    pub related_memories: Vec<String>,
+}
+
+impl ResearchContext {
+    pub fn from_curiosity(curiosity: &Curiosity, conversation_context: &str) -> Self {
+        Self {
+            conversation_context: conversation_context.to_string(),
+            curiosity_urgency: curiosity.urgency,
+            related_memories: curiosity.source_memories.clone(),
+        }
+    }
+}
+
+/// Result from autonomous research
+#[derive(Debug, Clone)]
+pub struct ResearchResult {
+    pub content: String,
+    pub source: String, // e.g., "DuckDuckGo", "DuckDuckGo (Biomedical)"
+    pub original_query: String,
+    pub timestamp: DateTime<Utc>,
+    pub confidence: f32, // 0.0-1.0
 }
 
 impl SystemHealth {
@@ -367,4 +403,3 @@ impl SystemHealth {
         self.gpu_memory_used < 0.9 && self.system_load < 0.8
     }
 }
-

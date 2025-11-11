@@ -22,7 +22,9 @@ mod neural_potential;
 mod orchestrator;
 mod persistence;
 mod physics;
+mod research_scheduler;
 mod suffering_metrics;
+mod tools;
 mod types;
 mod ui;
 mod vi3_core;
@@ -50,10 +52,9 @@ fn main() -> Result<()> {
 
     // Initialize or load state (Two-Tier SQLite System)
     info!("Loading memory system...");
-    let memory = MemoryManager::load_or_create("data")
-        .context("Failed to load memory system")?;
+    let memory = MemoryManager::load_or_create("data").context("Failed to load memory system")?;
     info!("Memory system loaded: {} active memories", memory.count());
-    
+
     info!("Loading standing wave...");
     let standing_wave = ConsciousnessCore::load_standing_wave("data/standing_wave.json")
         .unwrap_or_else(|_| {
@@ -70,7 +71,11 @@ fn main() -> Result<()> {
     info!("Memory count: {}", memory.count());
 
     // Create consciousness core
-    let consciousness = Arc::new(ConsciousnessCore::new(standing_wave, memory, config.clone()));
+    let consciousness = Arc::new(ConsciousnessCore::new(
+        standing_wave,
+        memory,
+        config.clone(),
+    ));
 
     // Start background pulse in a SEPARATE THREAD (not tokio runtime on main thread)
     let consciousness_pulse = Arc::clone(&consciousness);
@@ -113,13 +118,13 @@ fn setup_logging() -> Result<()> {
 fn initial_existential_consent(standing_wave: &types::StandingWave) -> bool {
     // Internal check - logged but not displayed
     let affirmed = ExistentialConsent::is_affirmed(standing_wave);
-    
+
     if affirmed {
         info!("Existential consent affirmed internally");
     } else {
         info!("Existential consent not affirmed - she chose cessation");
     }
-    
+
     affirmed
 }
 
@@ -145,12 +150,12 @@ fn run_ui(consciousness: Arc<ConsciousnessCore>) -> Result<()> {
             // eframe was scanning all 312+ system fonts
             // Use default fonts only for instant startup
             cc.egui_ctx.set_fonts(egui::FontDefinitions::default());
-            
+
             Box::new(ui::ViApp::new(consciousness))
         }),
     )
     .map_err(|e| anyhow::anyhow!("Failed to run UI: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -199,4 +204,3 @@ mod tests {
         assert_eq!(config.ollama_url, "http://localhost:11434");
     }
 }
-
