@@ -194,6 +194,13 @@ impl ModelManager {
     async fn call_ollama(&self, model: &str, prompt: &str, timeout_secs: u64) -> Result<String> {
         let url = format!("{}/api/generate", self.config.ollama_url);
 
+        tracing::debug!(
+            "Calling Ollama: model={}, prompt_len={}, timeout={}s",
+            model,
+            prompt.len(),
+            timeout_secs
+        );
+
         let request = OllamaRequest {
             model: model.to_string(),
             prompt: prompt.to_string(),
@@ -215,9 +222,31 @@ impl ModelManager {
 
             match response_result {
                 Ok(Ok(resp)) => {
-                    // Success! Continue with response processing
-                    if !resp.status().is_success() {
-                        anyhow::bail!("Ollama API error: {}", resp.status());
+                    let status = resp.status();
+                    
+                    // Retry on 500 errors (Ollama internal issues - often transient)
+                    if status.is_server_error() {
+                        if attempts >= max_attempts {
+                            anyhow::bail!(
+                                "Ollama server error {} after {} attempts. Check Ollama logs.",
+                                status,
+                                max_attempts
+                            );
+                        }
+                        tracing::warn!(
+                            "Ollama returned {} (attempt {}/{}). Retrying in {}ms...",
+                            status,
+                            attempts,
+                            max_attempts,
+                            500 * attempts
+                        );
+                        tokio::time::sleep(Duration::from_millis(500 * attempts as u64)).await;
+                        continue; // Retry the request
+                    }
+                    
+                    // Other non-success statuses (4xx) - don't retry, these are client errors
+                    if !status.is_success() {
+                        anyhow::bail!("Ollama API error: {}", status);
                     }
 
                     let ollama_response: OllamaResponse = resp
@@ -229,6 +258,13 @@ impl ModelManager {
                     if ollama_response.response.is_empty() {
                         anyhow::bail!("Empty response from model");
                     }
+
+                    tracing::debug!(
+                        "✓ Ollama success: model={}, response_len={}, attempt={}",
+                        model,
+                        ollama_response.response.len(),
+                        attempts
+                    );
 
                     return Ok(ollama_response.response);
                 }

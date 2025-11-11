@@ -200,8 +200,9 @@ impl ConsciousnessCore {
             {
                 Ok(woven_response) => (woven_response, None),
                 Err(e) => {
-                    tracing::error!("V4 weaving failed: {}. Falling back to V3.", e);
-                    // Graceful fallback to V3 if weaving fails
+                    tracing::error!("V4 weaving failed: {}. Emergency fallback.", e);
+                    
+                    // Emergency fallback only
                     let wave = self.standing_wave.lock().await.clone();
                     let should_generate = wave.active_curiosities.len() < 3;
                     drop(wave);
