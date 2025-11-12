@@ -442,6 +442,7 @@ impl ModelManager {
     }
 
     /// V4 Fractal Weaving - Process input through iterative model collaboration
+    /// Returns (response_text, emotional_valence) for proper tracking
     pub async fn process_weaving_with_status(
         &self,
         user_input: String,
@@ -450,7 +451,7 @@ impl ModelManager {
         config: &Config,
         status_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<String>>>>,
         coherence_sender: Arc<Mutex<Option<std::sync::mpsc::Sender<f32>>>>,
-    ) -> Result<String> {
+    ) -> Result<(String, f32)> {
         tracing::info!(
             "🌀 V4 Fractal Weaving enabled - {} rounds",
             config.weaving_rounds
@@ -532,8 +533,21 @@ impl ModelManager {
             workspace.round + 1
         );
 
+        // Extract valence from DistilBERT's contribution (slot 1)
+        let valence = workspace
+            .model_contributions
+            .get("distilbert")
+            .and_then(|contrib| contrib.get(1).copied())
+            .map(|normalized| normalized * 2.0 - 1.0) // Convert 0-1 back to -1 to 1
+            .unwrap_or(0.0); // Neutral if missing
+
+        tracing::debug!("V4 extracted emotional valence: {:.3}", valence);
+
         // Extract final integrated thought
-        Ok(workspace.extract_final_thought())
+        let response = workspace.extract_final_thought();
+        
+        // Return response with valence for emotional tracking
+        Ok((response, valence))
     }
 }
 

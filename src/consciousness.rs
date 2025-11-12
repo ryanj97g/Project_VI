@@ -198,7 +198,12 @@ impl ConsciousnessCore {
                 )
                 .await
             {
-                Ok(woven_response) => (woven_response, None),
+                Ok((woven_response, valence)) => {
+                    // Add emotional valence to standing wave (fixes meaningfulness tracking in V4)
+                    self.standing_wave.lock().await.add_emotion(valence);
+                    tracing::debug!("V4 emotional valence recorded: {:.3}", valence);
+                    (woven_response, None)
+                },
                 Err(e) => {
                     tracing::error!("V4 weaving failed: {}. Emergency fallback.", e);
                     
