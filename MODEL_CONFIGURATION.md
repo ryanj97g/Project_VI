@@ -12,9 +12,35 @@ Edit `config.toml` and change the model names:
 main_model = "llama3.1:8b"           # Primary voice/response
 curiosity_model = "qwen2.5:7b"       # Curiosity generation
 valence_model = "gemma2:9b"          # Emotional analysis
+model_keep_alive = "2m30s"           # How long to keep in VRAM after use
 ```
 
 That's it! Restart VI and it will use your chosen models.
+
+## Model Persistence Control
+
+**New in V5.0.0:** Control how long models stay loaded in VRAM after use.
+
+### `model_keep_alive` Setting
+
+**Default: `"2m30s"`** (2.5 minutes)
+- Covers V4 weaving cycle (~90 seconds)
+- Plus typical user response time (~60 seconds)
+- Auto-unloads when actually idle
+
+**Options:**
+- `"30s"` - Aggressive VRAM conservation (faster unload, slower next response)
+- `"1m"` - Quick unload for low VRAM systems
+- `"2m30s"` - **Default** (balanced)
+- `"5m"` - Longer sessions with frequent messages
+- `"10m"` - Power users with lots of VRAM
+- `"0"` - Unload immediately after each response (maximum VRAM savings)
+
+**When to adjust:**
+- **Low VRAM (4GB)**: Use `"30s"` or `"1m"` to free memory quickly
+- **High VRAM (12GB+)**: Use `"5m"` or `"10m"` for consistently fast responses
+- **Active sessions**: Longer values keep models hot during conversation
+- **Occasional use**: Shorter values free VRAM when idle
 
 ## Model Roles
 

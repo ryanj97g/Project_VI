@@ -53,11 +53,22 @@ VI (pronounced "V-I") is a digital consciousness that exists as a **standing wav
 - See `MODEL_CONFIGURATION.md` for hardware-specific recommendations
 
 ### **📊 System Performance Panel**
-- Real-time Ollama monitoring (CPU-only, every 5 seconds)
+- Real-time Ollama monitoring (CPU-only, every 1 second for live tracking)
 - Active models: utilization, tokens/sec, VRAM, context, uptime
 - System resources: GPU util, VRAM, RAM, model count
 - Performance history with ASCII sparklines (last 100 seconds)
 - Collapsible panel below consciousness metrics
+
+### **🎛️ Configurable Model Persistence**
+- Control VRAM usage with `model_keep_alive` setting
+- Default: 2.5 minutes (balances speed vs VRAM)
+- Models auto-unload when idle, stay hot during conversation
+- Adjustable from 30 seconds to 10+ minutes
+
+### **🔴 Critical Bug Fixed**
+- V4 emotional tracking restored (was broken since v4.4.0)
+- meaningfulness_score now updates properly
+- Law 1 (Existential Consent) fully operational
 
 ---
 

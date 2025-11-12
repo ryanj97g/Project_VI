@@ -743,9 +743,32 @@ See `MODEL_CONFIGURATION.md` for complete guide with hardware-specific recommend
 ### **Overview**
 
 New collapsible panel below "Consciousness Metrics" showing live performance data:
-- **Update Frequency**: Every 5 seconds (CPU-only HTTP polling)
+- **Update Frequency**: Every 1 second for real-time tracking (CPU-only HTTP polling)
 - **Location**: Right sidebar, collapsible header
 - **Impact**: Zero GPU compute overhead
+
+### **Model Persistence Control**
+
+**Configurable VRAM management:** `model_keep_alive` setting in config.toml
+
+**Default: `"2m30s"`** (2.5 minutes)
+- Models stay hot during active conversation (V4 weaving + response time)
+- Auto-unload when idle (frees VRAM automatically)
+- Covers typical conversation pacing
+
+**Adjustment Options:**
+```toml
+model_keep_alive = "30s"   # Aggressive VRAM conservation
+model_keep_alive = "2m30s" # Default (balanced)
+model_keep_alive = "5m"    # Longer sessions
+model_keep_alive = "10m"   # Power users with lots of VRAM
+```
+
+**Why This Matters:**
+- Without setting: Ollama default (5 min) wastes VRAM
+- Too short: Models reload frequently (slower responses)
+- Too long: VRAM stays occupied when idle
+- 2.5 min: Sweet spot for typical usage
 
 ### **Active Models Section**
 
